@@ -1,0 +1,3 @@
+[submodule "PointVS"]
+	path = PointVS
+	url = https://github.com/jscant/PointVS
