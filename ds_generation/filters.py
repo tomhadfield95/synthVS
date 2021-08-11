@@ -7,27 +7,33 @@ def vec_to_vec_dist(p1, p2):
     return np.linalg.norm(p1 - p2)
 
 
-def pharm_ligand_distance_filter(ligand, pharmMol, threshold=2):
+def pharm_ligand_distance_filter(ligand, pharm_mol, threshold=2):
     # For each atom in the pharmMol, we want to compute the distance to each ligand atom.
     # If a pharm atom is closer to a ligand atom than the threshold, then we remove it
 
-    pharm_mol_conf = pharmMol.GetConformer()
+    if pharm_mol is None or pharm_mol.GetNumHeavyAtoms() < 1:
+        return None
+
+    pharm_mol_conf = pharm_mol.GetConformer()
     ligand_conf = ligand.GetConformer()
 
-    pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i)) for i in range(pharmMol.GetNumHeavyAtoms())]
-    lig_positions = [np.array(ligand_conf.GetAtomPosition(i)) for i in range(ligand.GetNumHeavyAtoms())]
+    pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i)) for
+                           i in range(pharm_mol.GetNumHeavyAtoms())]
+    lig_positions = [np.array(ligand_conf.GetAtomPosition(i)) for
+                     i in range(ligand.GetNumHeavyAtoms())]
 
     new_pharm_mol = Chem.RWMol()
     pharm_mol_positions_to_keep = []
 
-    for i in range(pharmMol.GetNumHeavyAtoms()):
+    for i in range(pharm_mol.GetNumHeavyAtoms()):
 
         # Compare pharmacophore position to each ligand atom
-        distances = [vec_to_vec_dist(pharm_mol_positions[i], lp) for lp in lig_positions]
+        distances = [vec_to_vec_dist(pharm_mol_positions[i], lp) for
+                     lp in lig_positions]
 
         if min(distances) > threshold:
             # Pharmacophore isn't too close to any ligand atoms.
-            atom_type = pharmMol.GetAtomWithIdx(i).GetAtomicNum()
+            atom_type = pharm_mol.GetAtomWithIdx(i).GetAtomicNum()
             new_pharm_mol.AddAtom(Chem.Atom(atom_type))
             pharm_mol_positions_to_keep.append(pharm_mol_positions[i])
 
@@ -49,11 +55,12 @@ def pharm_pharm_distance_filter(pharm_mol, threshold=3):
     # Otherwise discard it.
 
     pharm_mol_conf = pharm_mol.GetConformer()
-    pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i)) for i in range(pharm_mol.GetNumHeavyAtoms())]
+    pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i)) for
+                           i in range(pharm_mol.GetNumHeavyAtoms())]
 
     new_pharm_mol = Chem.RWMol()
-    if pharm_mol.GetNumHeavyAtoms() < 1:
-        return new_pharm_mol
+    if pharm_mol is None or pharm_mol.GetNumHeavyAtoms() < 1:
+        return None
     pharm_mol_positions_to_keep = []
 
     # Add the first atom
@@ -62,10 +69,12 @@ def pharm_pharm_distance_filter(pharm_mol, threshold=3):
 
     for i in range(1, pharm_mol.GetNumHeavyAtoms()):
 
-        distances = [vec_to_vec_dist(pharm_mol_positions[i], pp) for pp in pharm_mol_positions_to_keep]
+        distances = [vec_to_vec_dist(pharm_mol_positions[i], pp) for
+                     pp in pharm_mol_positions_to_keep]
 
         if min(distances) > threshold:
-            new_pharm_mol.AddAtom(Chem.Atom(pharm_mol.GetAtomWithIdx(i).GetAtomicNum()))
+            new_pharm_mol.AddAtom(
+                Chem.Atom(pharm_mol.GetAtomWithIdx(i).GetAtomicNum()))
             pharm_mol_positions_to_keep.append(pharm_mol_positions[i])
 
     # Now we want to add the coordinates to the mol
@@ -82,6 +91,9 @@ def pharm_pharm_distance_filter(pharm_mol, threshold=3):
 def sample_from_pharmacophores(pharm_mol, poisson_mean=10):
     # Sample from a poisson distribution to get the number of pharmacophores to include in the final mol
     # Then sample that many mols
+
+    if pharm_mol is None or pharm_mol.GetNumHeavyAtoms() == 0:
+        return None
 
     pharm_mol_conf = pharm_mol.GetConformer()
     pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i)) for i in range(pharm_mol.GetNumHeavyAtoms())]

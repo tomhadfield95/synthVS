@@ -26,6 +26,9 @@ def assign_label(ligand, pharm_mol, threshold=3.5):
 
         return pharms_idx_dict
 
+    if pharm_mol is None:
+        return ligand, None, 0
+
     ligand_pharms_indices = get_pharm_indices(ligand)
     ligand_pharms_positions = {}
     # get positions
