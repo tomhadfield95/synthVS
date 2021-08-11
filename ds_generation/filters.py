@@ -52,6 +52,8 @@ def pharm_pharm_distance_filter(pharm_mol, threshold=3):
     pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i)) for i in range(pharm_mol.GetNumHeavyAtoms())]
 
     new_pharm_mol = Chem.RWMol()
+    if pharm_mol.GetNumHeavyAtoms() < 1:
+        return new_pharm_mol
     pharm_mol_positions_to_keep = []
 
     # Add the first atom
