@@ -9,10 +9,10 @@ import argparse
 from point_vs.utils import expand_path, mkdir, save_yaml
 from rdkit import Chem
 
-from ds_generation.filters import sample_from_pharmacophores, \
+from filters import sample_from_pharmacophores, \
     pharm_pharm_distance_filter, pharm_ligand_distance_filter
-from ds_generation.generate import create_pharmacophore_mol
-from ds_generation.label import assign_label
+from generate import create_pharmacophore_mol
+from label import assign_label
 
 
 def save_list_of_mols(mols, loc):
@@ -86,6 +86,5 @@ if __name__ == '__main__':
                              'the combination of the two to be considered an '
                              'active')
 
-    parser.add_argument()
     arguments = parser.parse_args()
     main(arguments)
