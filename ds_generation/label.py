@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 from rdkit import RDConfig
 from rdkit.Chem import ChemicalFeatures
@@ -7,11 +9,14 @@ def assign_label(ligand, pharm_mol, threshold=3.5):
     # If there is a pharmacophore within the threshold of a matching ligand pharmacophore, then we return a label of 1
     # Otherwise a label of 0
 
+    def vec_to_vec_dist(p1, p2):
+        return np.linalg.norm(p1 - p2)
+
     def get_pharm_indices(mol):
         pharms = ['Hydrophobe', 'Donor', 'Acceptor', 'LumpedHydrophobe']
         pharms_idx_dict = {'LumpedHydrophobe': [], 'Hydrophobe': [], 'Acceptor': [], 'Donor': []}
 
-        fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
+        fdef_name = str(Path(RDConfig.RDDataDir, 'BaseFeatures.fdef'))
         factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
 
         feats = factory.GetFeaturesForMol(mol)
