@@ -33,10 +33,10 @@ def main(args):
     print('Loading input mols')
     if sdf_loc.is_dir():
         sdfs = sdf_loc.glob('*.sdf')
-        sups = [Chem.SDMolSupplier(sdf) for sdf in sdfs]
+        sups = [Chem.SDMolSupplier(str(sdf)) for sdf in sdfs]
         mols = [mol for sup in sups for mol in sup]
     else:
-        mols = [m for m in Chem.SDMolSupplier(sdf_loc)]
+        mols = [m for m in Chem.SDMolSupplier(str(sdf_loc))]
 
     print('Generating initial pharmacophores')
     pharm_mols = [
