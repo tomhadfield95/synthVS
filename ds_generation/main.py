@@ -35,7 +35,7 @@ def rdmol_to_dataframe(mol):
 
     if len(atom_types) == 1:
         positions = positions.reshape((1, 3))
-        
+
     df = pd.DataFrame({
         'x': positions[:, 0],
         'y': positions[:, 1],
@@ -60,6 +60,7 @@ def the_full_monty(
         lig_mol, randomly_sampled_subset, threshold=distance_threshold)
     ligand_df = rdmol_to_dataframe(ligand)
     pharmacophore_df = rdmol_to_dataframe(pharmacophore)
+    print(label)
     return ligand_df, pharmacophore_df, label
 
 
@@ -102,6 +103,7 @@ def main(args):
     else:
         mols = [m for m in Chem.SDMolSupplier(str(sdf_loc))]
 
+    print('Generating pharmacophores')
     if args.use_multiprocessing:
         mp_full_monty(mols,
                       output_dir / 'ligands',

@@ -4,6 +4,9 @@ import numpy as np
 from rdkit import RDConfig
 from rdkit.Chem import ChemicalFeatures
 
+FACTORY = ChemicalFeatures.BuildFeatureFactory(
+    str(Path(RDConfig.RDDataDir, 'BaseFeatures.fdef')))
+
 
 def assign_label(ligand, pharm_mol, threshold=3.5):
     # If there is a pharmacophore within the threshold of a matching ligand pharmacophore, then we return a label of 1
@@ -16,10 +19,7 @@ def assign_label(ligand, pharm_mol, threshold=3.5):
         pharms = ['Hydrophobe', 'Donor', 'Acceptor', 'LumpedHydrophobe']
         pharms_idx_dict = {'LumpedHydrophobe': [], 'Hydrophobe': [], 'Acceptor': [], 'Donor': []}
 
-        fdef_name = str(Path(RDConfig.RDDataDir, 'BaseFeatures.fdef'))
-        factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
-
-        feats = factory.GetFeaturesForMol(mol)
+        feats = FACTORY.GetFeaturesForMol(mol)
         for feat in feats:
             if feat.GetFamily() in pharms:
                 pharms_idx_dict[feat.GetFamily()] = pharms_idx_dict[feat.GetFamily()] + list(feat.GetAtomIds())
