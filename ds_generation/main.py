@@ -24,6 +24,17 @@ def rdmol_to_dataframe(mol):
                           i in range(mol.GetNumHeavyAtoms())])
     atom_types = [mol.GetAtomWithIdx(i).GetAtomicNum() for
                   i in range(mol.GetNumHeavyAtoms())]
+    
+    if len(atom_types) == 1:
+        positions = positions.reshape((1, 3))
+    elif not len(atom_types):
+        return pd.DataFrame({
+            'x': [],
+            'y': [],
+            'z': [],
+            'type': []
+        })
+
     df = pd.DataFrame({
         'x': positions[:, 0],
         'y': positions[:, 1],
