@@ -99,4 +99,7 @@ def parse_args():
     parser.add_argument('--val_on_epoch_end', '-v', action='store_true',
                         help='Run inference ion the validation set at the end '
                              'of every epoch during training')
+    parser.add_argument('--no_receptor', action='store_true',
+                        help='Do not include receptor information during '
+                             'training/testing')
     return parser.parse_args()

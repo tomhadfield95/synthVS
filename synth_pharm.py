@@ -92,19 +92,19 @@ if __name__ == '__main__':
     ds_class = SynthPharmDataset
     train_dl = get_data_loader(
         args.train_data_root,
-        dataset_class=SynthPharmDataset,
         batch_size=args.batch_size, rot=False,
-        polar_hydrogens=args.hydrogens)
+        polar_hydrogens=args.hydrogens,
+        no_receptor=args.no_receptor)
 
     # Is a validation set specified?
     test_dl = None
     if args.test_data_root is not None:
         test_dl = get_data_loader(
             args.test_data_root,
-            dataset_class=SynthPharmDataset,
             polar_hydrogens=args.hydrogens,
             batch_size=args.batch_size,
-            rot=False, mode='val')
+            rot=False, mode='val',
+            no_receptor=args.no_receptor)
 
     args_to_record = vars(args)
 

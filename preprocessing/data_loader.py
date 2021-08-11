@@ -16,15 +16,15 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 
 
 def get_data_loader(
-        *data_roots, dataset_class, receptors=None, batch_size=32, rot=True,
-        polar_hydrogens=True, mode='train'):
+        *data_roots, receptors=None, batch_size=32, rot=True,
+        polar_hydrogens=True, mode='train', no_receptor=False):
     """Give a DataLoader from a list of receptors and data roots."""
     ds_kwargs = {
         'rot': rot
     }
     ds = multiple_source_dataset(
-        dataset_class, *data_roots, balanced=True,
-        polar_hydrogens=polar_hydrogens, receptors=receptors, **ds_kwargs)
+        *data_roots, balanced=True, polar_hydrogens=polar_hydrogens,
+        receptors=receptors, no_receptor=no_receptor, **ds_kwargs)
     collate = get_collate_fn(ds.feature_dim)
     sampler = ds.sampler if mode == 'train' else None
     return DataLoader(
@@ -39,16 +39,11 @@ def get_data_loader(
 """
 
 
-def multiple_source_dataset(
-        loader_class, *base_paths, receptors=None, polar_hydrogens=True,
-        balanced=True, **kwargs):
+def multiple_source_dataset(*base_paths, receptors=None, polar_hydrogens=True,
+                            balanced=True, no_receptor=False, **kwargs):
     """Concatenate mulitple datasets into one, preserving balanced sampling.
 
     Arguments:
-        loader_class: one of either PointCloudDataset or SE3TransformerLoader,
-            inheriting from Datset. This class should have in its constructor a
-            list of binary labels associated with each item, stored in
-            <class>.labels.
         base_paths: locations of parquets files, one for each dataset.
         receptors: receptors to include. If None, all receptors found are used.
         polar_hydrogens:
@@ -64,9 +59,9 @@ def multiple_source_dataset(
         [Path(bp).expanduser() for bp in base_paths if bp is not None])
     for base_path in base_paths:
         if base_path is not None:
-            dataset = loader_class(
+            dataset = SynthPharmDataset(
                 base_path, receptors=receptors, polar_hydrogens=polar_hydrogens,
-                **kwargs)
+                no_receptor=False, **kwargs)
             labels += list(dataset.labels)
             filenames += dataset.filenames
             datasets.append(dataset)
@@ -96,7 +91,7 @@ class SynthPharmDataset(torch.utils.data.Dataset):
 
     def __init__(
             self, base_path, polar_hydrogens=True, rot=False, receptors=None,
-            **kwargs):
+            no_receptor=False, **kwargs):
         """Initialise dataset.
 
         Arguments:
@@ -113,6 +108,7 @@ class SynthPharmDataset(torch.utils.data.Dataset):
 
         super().__init__(**kwargs)
         self.base_path = Path(base_path).expanduser()
+        self.no_receptor = no_receptor
 
         if not self.base_path.exists():
             raise FileNotFoundError(
@@ -205,9 +201,13 @@ class SynthPharmDataset(torch.utils.data.Dataset):
             lig_struct = lig_struct[lig_struct['type'] > 1]
         lig_struct.type = lig_struct['type'].map(
             self.atomic_number_to_index)
-        pharm_struct = pd.read_parquet(pharm_fname)
-        pharm_struct['type'] += self.max_ligand_feature_id
-        struct = pd.concat([pharm_struct, lig_struct])
+
+        if self.no_receptor:
+            struct = lig_struct
+        else:
+            pharm_struct = pd.read_parquet(pharm_fname)
+            pharm_struct['type'] += self.max_ligand_feature_id
+            struct = pd.concat([pharm_struct, lig_struct])
 
         p = torch.from_numpy(
             np.expand_dims(self.transformation(
