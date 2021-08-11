@@ -14,5 +14,5 @@ pip install -e .
 cd ..
 git clone https://github.com/jscant/SynthPharm
 cd SynthPharm
-# Now you are ready.
+pip install -e . -vvv
 ```
