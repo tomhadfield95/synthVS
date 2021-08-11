@@ -6,6 +6,8 @@ written by, Tom Hadfield.
 """
 import argparse
 
+import numpy as np
+import pandas as pd
 from pathos.multiprocessing import ProcessingPool as Pool
 from point_vs.utils import expand_path, mkdir, save_yaml
 from rdkit import Chem
@@ -16,12 +18,21 @@ from generate import create_pharmacophore_mol
 from label import assign_label
 
 
-def save_list_of_mols(mols, loc):
-    w = Chem.SDWriter(loc)
-    for m in mols:
-        w.write(m)
-
-    return 0
+def rdmol_to_dataframe(mol):
+    conf = mol.GetConformer()
+    positions = np.array([np.array(conf.GetAtomPosition(i)) for
+                          i in range(mol.GetNumHeavyAtoms())])
+    atom_types = [mol.GetAtomWithIdx(i).GetAtomicNum() for
+                  i in range(mol.GetNumHeavyAtoms())]
+    df = pd.DataFrame({
+        'x': positions[:, 0],
+        'y': positions[:, 1],
+        'z': positions[:, 2],
+        'type': atom_types
+    })
+    if isinstance(mol, Chem.RWMol):
+        df['type'] = df['type'].map({8: 0, 7: 1, 6: 2})
+    return df
 
 
 def the_full_monty(
@@ -35,7 +46,9 @@ def the_full_monty(
         filtered_by_pharm_pharm_dist, mean_pharmacophores)
     ligand, pharmacophore, label = assign_label(
         lig_mol, randomly_sampled_subset, threshold=distance_threshold)
-    return ligand, pharmacophore, label
+    ligand_df = rdmol_to_dataframe(ligand)
+    pharmacophore_df = rdmol_to_dataframe(pharmacophore)
+    return ligand_df, pharmacophore_df, label
 
 
 def mp_full_monty(lig_mols, lig_output_dir, pharm_output_dir,
@@ -56,11 +69,10 @@ def mp_full_monty(lig_mols, lig_output_dir, pharm_output_dir,
 
     labels = {}
     for i in range(len(results)):
-        lig_writer = Chem.SDWriter(str(lig_output_dir / 'lig{}.sdf'.format(i)))
-        pharm_writer = Chem.SDWriter(
-            str(pharm_output_dir / 'pharm{}.sdf'.format(i)))
-        lig_writer.write(results[i][0])
-        pharm_writer.write(results[i][1])
+        pharm_fname = pharm_output_dir / 'pharm{}.parquet'.format(i)
+        lig_fname = lig_output_dir / 'lig{}.parquet'.format(i)
+        results[i][0].to_parquet(lig_fname)
+        results[i][1].to_parquet(pharm_fname)
         labels[i] = results[i][2]
     save_yaml(labels, lig_output_dir.parent / 'labels.yaml')
 
