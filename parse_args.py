@@ -79,7 +79,7 @@ def parse_args():
     parser.add_argument('--dropout', type=float, default=0.0,
                         help='Chance for nodes to be inactivated on each '
                              'trainin batch (EGNN)')
-    parser.add_argument('--fill', type=float, default=0.75,
+    parser.add_argument('--fill', type=float, default=1.0,
                         help='LieTransformer fill parameter')
     parser.add_argument('--use_1cycle', action='store_true',
                         help='Use 1cycle learning rate scheduling')
