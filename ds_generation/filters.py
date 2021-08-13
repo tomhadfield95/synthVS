@@ -1,5 +1,12 @@
+from pathlib import Path
+
 import numpy as np
 from rdkit import Chem
+from rdkit import RDConfig
+from rdkit.Chem import ChemicalFeatures
+
+FACTORY = ChemicalFeatures.BuildFeatureFactory(
+    str(Path(RDConfig.RDDataDir, 'BaseFeatures.fdef')))
 
 
 # Post-pharmacophore generation filters
@@ -88,17 +95,47 @@ def pharm_pharm_distance_filter(pharm_mol, threshold=3):
     return new_pharm_mol
 
 
-def sample_from_pharmacophores(pharm_mol, poisson_mean=10):
-    # Sample from a poisson distribution to get the number of pharmacophores to include in the final mol
-    # Then sample that many mols
+def sample_from_pharmacophores(
+        pharm_mol, ligand=None, poisson_mean=None, num_opportunities=None):
+    """Sample from the filtered pharmacophores to get the desired distribution.
+
+    Either sample from a poisson distribution, or such that the number of
+    `interaction opportunities' is roughly constant.
+
+    Arguments:
+        pharm_mol: filtered pharmacophore molecule (RWMol)
+        ligand: ligand molecule (RDMol), only if num_opportunities is not None
+        poisson_mean: parameter for distribution of number of pharmacophores
+            (mean)
+        num_opportunities: the number of interaction opportunities is the
+            number of interacting ligand atoms * the number of pharmacophores.
+
+    Returns:
+        RDMol containing sample of original pharmacophores.
+    """
+    assert int((poisson_mean is None) + (num_opportunities is None)) == 1, (
+        'poisson_mean and num_opportunities are mutually exclusive.')
+    assert not (num_opportunities is not None and ligand is None), (
+        'a ligand must be supplied with num_opportunities')
 
     if pharm_mol is None or pharm_mol.GetNumHeavyAtoms() == 0:
         return None
 
-    pharm_mol_conf = pharm_mol.GetConformer()
-    pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i)) for i in range(pharm_mol.GetNumHeavyAtoms())]
+    if poisson_mean is not None:
+        pharm_mol_conf = pharm_mol.GetConformer()
+        pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i)) for
+                               i in range(pharm_mol.GetNumHeavyAtoms())]
+        num_to_sample = int(np.random.poisson(lam=poisson_mean))
+    else:
+        pharm_mol_conf = pharm_mol.GetConformer()
+        pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i))
+                               for i in range(pharm_mol.GetNumHeavyAtoms())]
 
-    num_to_sample = int(np.random.poisson(lam=poisson_mean))
+        num_ligand_pharmacophores = get_pharm_numbers(ligand)
+        total_lig_pharms = num_ligand_pharmacophores['Donor'] + \
+                           num_ligand_pharmacophores['Acceptor']
+
+        num_to_sample = int(num_opportunities / total_lig_pharms)
 
     if num_to_sample > pharm_mol.GetNumHeavyAtoms():
         return pharm_mol  # return all the atoms
@@ -121,3 +158,19 @@ def sample_from_pharmacophores(pharm_mol, poisson_mean=10):
     new_pharm_mol.AddConformer(conf)
 
     return new_pharm_mol
+
+
+def get_pharm_numbers(mol):
+    pharm_counts = {'Acceptor': 0, 'Donor': 0}
+    if mol.GetNumHeavyAtoms() < 1:
+        return pharm_counts
+    feats = FACTORY.GetFeaturesForMol(mol)
+    proc_feats = []
+    for feat in feats:
+        if feat.GetFamily() in pharm_counts.keys():
+            proc_feats.append(feat.GetFamily())
+
+    for p in proc_feats:
+        pharm_counts[p] += 1
+
+    return pharm_counts

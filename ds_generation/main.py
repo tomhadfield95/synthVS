@@ -48,37 +48,41 @@ def rdmol_to_dataframe(mol):
 
 
 def the_full_monty(
-        lig_mol, max_pharmacophores, mean_pharmacophores, distance_threshold):
+        lig_mol, max_pharmacophores, distance_threshold, poisson_mean,
+        num_opportunities):
     pharm_mol = create_pharmacophore_mol(lig_mol, max_pharmacophores)
     filtered_by_pharm_lig_dist = pharm_ligand_distance_filter(
         lig_mol, pharm_mol, threshold=2)
     filtered_by_pharm_pharm_dist = pharm_pharm_distance_filter(
         filtered_by_pharm_lig_dist)
     randomly_sampled_subset = sample_from_pharmacophores(
-        filtered_by_pharm_pharm_dist, mean_pharmacophores)
+        lig_mol, filtered_by_pharm_pharm_dist, poisson_mean=poisson_mean,
+        num_opportunities=num_opportunities)
     ligand, pharmacophore, label = assign_label(
         lig_mol, randomly_sampled_subset, threshold=distance_threshold)
     ligand_df = rdmol_to_dataframe(ligand)
     pharmacophore_df = rdmol_to_dataframe(pharmacophore)
-    print(label)
     return ligand_df, pharmacophore_df, label
 
 
 def mp_full_monty(lig_mols, lig_output_dir, pharm_output_dir,
-                  max_pharmacophores, mean_pharmacophores, distance_thresholds):
+                  max_pharmacophores, poisson_mean, num_opportunities,
+                  distance_thresholds):
     lig_output_dir = mkdir(lig_output_dir)
     pharm_output_dir = mkdir(pharm_output_dir)
     n = len(lig_mols)
     if not isinstance(max_pharmacophores, (list, tuple)):
         max_pharmacophores = [max_pharmacophores] * n
-    if not isinstance(mean_pharmacophores, (list, tuple)):
-        mean_pharmacophores = [mean_pharmacophores] * n
+    if not isinstance(poisson_mean, (list, tuple)):
+        poisson_mean = [poisson_mean] * n
     if not isinstance(distance_thresholds, (list, tuple)):
         distance_thresholds = [distance_thresholds] * n
+    if not isinstance(num_opportunities, (list, tuple)):
+        num_opportunities = [num_opportunities]
 
     results = Pool().map(
-        the_full_monty, lig_mols, max_pharmacophores,
-        mean_pharmacophores, distance_thresholds)
+        the_full_monty, lig_mols, max_pharmacophores, distance_thresholds,
+        poisson_mean, num_opportunities)
 
     labels = {}
     for i in range(len(results)):
@@ -110,6 +114,7 @@ def main(args):
                       output_dir / 'pharmacophores',
                       args.max_pharmacophores,
                       args.mean_pharmacophores,
+                      args.num_opportunities,
                       args.distance_threshold)
     else:
         lig_output_dir = mkdir(output_dir / 'ligands')
@@ -128,7 +133,8 @@ def main(args):
             for i in range(len(filtered_by_pharm_lig_dist))]
 
         randomly_sampled_subset = [
-            sample_from_pharmacophores(m, args.mean_pharmacophores)
+            sample_from_pharmacophores(
+                m, mols, args.mean_pharmacophores, args.num_opportunities)
             for m in filtered_by_pharm_pharm_dist]
 
         labels = {}
@@ -153,8 +159,10 @@ if __name__ == '__main__':
                         help='Directory in which to store outputs')
     parser.add_argument('--max_pharmacophores', '-m', type=int, default=20,
                         help='Maximum number of pharmacophores for each ligand')
-    parser.add_argument('--mean_pharmacophores', '-p', type=int, default=6,
+    parser.add_argument('--mean_pharmacophores', '-p', type=int, default=None,
                         help='Mean number of pharmacophores for each ligand')
+    parser.add_argument('--num_opportunities', '-n', type=int, default=None,
+                        help='Number of interaction opportunities per ligand.')
     parser.add_argument('--distance_threshold', '-t', type=float, default=3.5,
                         help='Maximum distance between ligand functional '
                              'groups and their respective pharmacophores for '
@@ -164,4 +172,9 @@ if __name__ == '__main__':
                         help='Use multiple CPU processes')
 
     arguments = parser.parse_args()
+    assert (bool(arguments.num_opportunities) + bool(
+        arguments.mean_pharmacophores)) == 1, (
+        'please specifiy precisely one of mean_pharmacophores and '
+        'num_opportunities')
+
     main(arguments)
