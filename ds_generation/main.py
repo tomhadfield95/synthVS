@@ -7,6 +7,7 @@ written by, Tom Hadfield.
 import argparse
 import multiprocessing as mp
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -64,25 +65,37 @@ def the_full_monty(
         lig_mol, randomly_sampled_subset, threshold=distance_threshold)
     ligand_df = rdmol_to_dataframe(ligand)
     pharmacophore_df = rdmol_to_dataframe(pharmacophore)
-    return ligand_df, pharmacophore_df, label
+    return ligand, pharmacophore, ligand_df, pharmacophore_df, label
 
 
-def save_dfs_and_get_label_dict(results, pharm_output_dir, lig_output_dir):
+def save_dfs_and_get_label_dict(results, output_dir):
     labels = {}
+    lig_df_output_dir = mkdir(output_dir, 'parquets', 'ligands')
+    pharm_df_output_dir = mkdir(output_dir, 'parquets', 'pharmacophores')
+    lig_sdf_output_dir = mkdir(output_dir, 'sdf', 'ligands')
+    pharm_sdf_output_dir = mkdir(output_dir, 'sdf', 'pharmacophores')
+
     for i in range(len(results)):
-        pharm_fname = pharm_output_dir / 'pharm{}.parquet'.format(i)
-        lig_fname = lig_output_dir / 'lig{}.parquet'.format(i)
-        results[i][0].to_parquet(lig_fname)
-        results[i][1].to_parquet(pharm_fname)
-        labels[i] = results[i][2]
+        pharm_df_fname = pharm_df_output_dir / 'pharm{}.parquet'.format(i)
+        lig_df_fname = lig_df_output_dir / 'lig{}.parquet'.format(i)
+
+        pharm_writer = Chem.SDWriter(str(Path(
+            pharm_sdf_output_dir, 'pharm{}.sdf'.format(i))))
+        lig_writer = Chem.SDWriter(str(Path(
+            lig_sdf_output_dir, 'lig{}.sdf'.format(i))))
+
+        lig_writer.write(results[i][0])
+        pharm_writer.write(results[i][1])
+        results[i][2].to_parquet(lig_df_fname)
+        results[i][3].to_parquet(pharm_df_fname)
+        labels[i] = results[i][-1]
+
     return labels
 
 
-def mp_full_monty(lig_mols, lig_output_dir, pharm_output_dir,
+def mp_full_monty(lig_mols, output_dir,
                   max_pharmacophores, area_coef,
                   poisson_mean, num_opportunities, distance_thresholds):
-    lig_output_dir = mkdir(lig_output_dir)
-    pharm_output_dir = mkdir(pharm_output_dir)
     n = len(lig_mols)
     if not isinstance(max_pharmacophores, (list, tuple)):
         max_pharmacophores = [max_pharmacophores] * n
@@ -98,15 +111,14 @@ def mp_full_monty(lig_mols, lig_output_dir, pharm_output_dir,
     results = Pool().map(
         the_full_monty, lig_mols, max_pharmacophores, area_coef,
         distance_thresholds, poisson_mean, num_opportunities)
-    labels = save_dfs_and_get_label_dict(results, pharm_output_dir, lig_output_dir)
-    save_yaml(labels, lig_output_dir.parent / 'labels.yaml')
+    labels = save_dfs_and_get_label_dict(
+        results, output_dir)
+    save_yaml(labels, output_dir.parent / 'labels.yaml')
 
 
 def main(args):
     sdf_loc = expand_path(args.ligands)
     output_dir = mkdir(args.output_dir)
-    lig_output_dir = mkdir(output_dir / 'ligands')
-    pharm_output_dir = mkdir(output_dir / 'pharmacophores')
 
     # can also use a directory full of individual SDF files
     print('Loading input mols')
@@ -122,8 +134,7 @@ def main(args):
         print('Using multiprocessing with {} cpus'.format(mp.cpu_count()))
         with Timer() as t:
             mp_full_monty(mols,
-                          lig_output_dir,
-                          pharm_output_dir,
+                          output_dir,
                           args.max_pharmacophores,
                           args.area_coef,
                           args.mean_pharmacophores,
@@ -137,11 +148,11 @@ def main(args):
                     args.distance_threshold, args.mean_pharmacophores,
                     args.num_opportunities)
                 for mol in mols]
-            labels = save_dfs_and_get_label_dict(
-                results, pharm_output_dir, lig_output_dir)
+            labels = save_dfs_and_get_label_dict(results, output_dir)
             save_yaml(labels, output_dir / 'labels.yaml')
     print('Runtime for {0} molecules: {1}'.format(
         len(mols), format_time(t.interval)))
+    print(t.interval)
 
 
 if __name__ == '__main__':
