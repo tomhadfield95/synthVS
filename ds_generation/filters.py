@@ -121,7 +121,7 @@ def sample_from_pharmacophores(
     if pharm_mol is None or pharm_mol.GetNumHeavyAtoms() == 0:
         return None
 
-    if poisson_mean is not None:
+    if num_opportunities is None:
         pharm_mol_conf = pharm_mol.GetConformer()
         pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i)) for
                                i in range(pharm_mol.GetNumHeavyAtoms())]
@@ -162,8 +162,6 @@ def sample_from_pharmacophores(
 
 def get_pharm_numbers(mol):
     pharm_counts = {'Acceptor': 0, 'Donor': 0}
-    if mol.GetNumHeavyAtoms() < 1:
-        return pharm_counts
     feats = FACTORY.GetFeaturesForMol(mol)
     proc_feats = []
     for feat in feats:

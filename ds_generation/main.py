@@ -58,13 +58,12 @@ def the_full_monty(
     filtered_by_pharm_pharm_dist = pharm_pharm_distance_filter(
         filtered_by_pharm_lig_dist)
     randomly_sampled_subset = sample_from_pharmacophores(
-        lig_mol, filtered_by_pharm_pharm_dist, poisson_mean=poisson_mean,
+        filtered_by_pharm_pharm_dist, lig_mol, poisson_mean=poisson_mean,
         num_opportunities=num_opportunities)
     ligand, pharmacophore, label = assign_label(
         lig_mol, randomly_sampled_subset, threshold=distance_threshold)
     ligand_df = rdmol_to_dataframe(ligand)
     pharmacophore_df = rdmol_to_dataframe(pharmacophore)
-    print(label)
     return ligand_df, pharmacophore_df, label
 
 
@@ -139,8 +138,9 @@ def main(args):
 
         randomly_sampled_subset = [
             sample_from_pharmacophores(
-                m, mols, args.mean_pharmacophores, args.num_opportunities)
-            for m in filtered_by_pharm_pharm_dist]
+                filtered_by_pharm_pharm_dist[i], mols[i],
+                args.mean_pharmacophores, args.num_opportunities)
+            for i in range(len(filtered_by_pharm_pharm_dist))]
 
         labels = {}
         for i in range(len(randomly_sampled_subset)):
