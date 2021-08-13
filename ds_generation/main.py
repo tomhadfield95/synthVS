@@ -12,9 +12,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from pathos.multiprocessing import ProcessingPool as Pool
-from point_vs.utils import expand_path, mkdir, save_yaml, pretify_dict, format_time, Timer
+from point_vs.utils import expand_path, mkdir, save_yaml, pretify_dict, \
+    format_time, Timer
 from rdkit import Chem
 
+from ds_generation.stats import write_statistics
 from filters import sample_from_pharmacophores, \
     pharm_pharm_distance_filter, pharm_ligand_distance_filter
 from generate import create_pharmacophore_mol
@@ -111,9 +113,7 @@ def mp_full_monty(lig_mols, output_dir,
     results = Pool().map(
         the_full_monty, lig_mols, max_pharmacophores, area_coef,
         distance_thresholds, poisson_mean, num_opportunities)
-    labels = save_dfs_and_get_label_dict(
-        results, output_dir)
-    save_yaml(labels, output_dir.parent / 'labels.yaml')
+    return results
 
 
 def main(args):
@@ -133,13 +133,13 @@ def main(args):
     if args.use_multiprocessing:
         print('Using multiprocessing with {} cpus'.format(mp.cpu_count()))
         with Timer() as t:
-            mp_full_monty(mols,
-                          output_dir,
-                          args.max_pharmacophores,
-                          args.area_coef,
-                          args.mean_pharmacophores,
-                          args.num_opportunities,
-                          args.distance_threshold)
+            results = mp_full_monty(mols,
+                                    output_dir,
+                                    args.max_pharmacophores,
+                                    args.area_coef,
+                                    args.mean_pharmacophores,
+                                    args.num_opportunities,
+                                    args.distance_threshold)
     else:
         with Timer() as t:
             results = [
@@ -148,11 +148,22 @@ def main(args):
                     args.distance_threshold, args.mean_pharmacophores,
                     args.num_opportunities)
                 for mol in mols]
-            labels = save_dfs_and_get_label_dict(results, output_dir)
-            save_yaml(labels, output_dir / 'labels.yaml')
+    labels = save_dfs_and_get_label_dict(results, output_dir)
+    save_yaml(labels, output_dir / 'labels.yaml')
+    print('Fraction of positive examples: {:.3f}'.format(
+        sum(labels.values()) / len(labels)))
     print('Runtime for {0} molecules: {1}'.format(
         len(mols), format_time(t.interval)))
-    print(t.interval)
+
+    lig_mols = [result[0] for result in results]
+    pharm_mols = [result[1] for result in results]
+    with Timer() as t:
+        stats = write_statistics(
+            output_dir / 'stats.txt', lig_mols, pharm_mols, labels)
+    print('Runtime for gathering statistics:', format_time(t.interval))
+    print()
+    print(stats)
+
 
 
 if __name__ == '__main__':
