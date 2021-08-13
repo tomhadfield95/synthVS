@@ -5,11 +5,13 @@ Generate synthetic pharmacophores. Code written by, or modified from code
 written by, Tom Hadfield.
 """
 import argparse
+import multiprocessing as mp
+import os
 
 import numpy as np
 import pandas as pd
 from pathos.multiprocessing import ProcessingPool as Pool
-from point_vs.utils import expand_path, mkdir, save_yaml
+from point_vs.utils import expand_path, mkdir, save_yaml, pretify_dict
 from rdkit import Chem
 
 from filters import sample_from_pharmacophores, \
@@ -62,6 +64,7 @@ def the_full_monty(
         lig_mol, randomly_sampled_subset, threshold=distance_threshold)
     ligand_df = rdmol_to_dataframe(ligand)
     pharmacophore_df = rdmol_to_dataframe(pharmacophore)
+    print(label)
     return ligand_df, pharmacophore_df, label
 
 
@@ -78,7 +81,7 @@ def mp_full_monty(lig_mols, lig_output_dir, pharm_output_dir,
     if not isinstance(distance_thresholds, (list, tuple)):
         distance_thresholds = [distance_thresholds] * n
     if not isinstance(num_opportunities, (list, tuple)):
-        num_opportunities = [num_opportunities]
+        num_opportunities = [num_opportunities] * n
 
     results = Pool().map(
         the_full_monty, lig_mols, max_pharmacophores, distance_thresholds,
@@ -109,6 +112,8 @@ def main(args):
 
     print('Generating pharmacophores')
     if args.use_multiprocessing:
+        print('Using multiprocessing with {} cpus'.format(mp.cpu_count()))
+        print(len(mols))
         mp_full_monty(mols,
                       output_dir / 'ligands',
                       output_dir / 'pharmacophores',
@@ -177,4 +182,9 @@ if __name__ == '__main__':
         'please specifiy precisely one of mean_pharmacophores and '
         'num_opportunities')
 
+    print()
+    print('#' * os.get_terminal_size().columns)
+    print(pretify_dict(vars(arguments), padding=4))
+    print('#' * os.get_terminal_size().columns)
+    print()
     main(arguments)
