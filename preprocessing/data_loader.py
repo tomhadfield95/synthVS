@@ -32,13 +32,6 @@ def get_data_loader(
         collate_fn=collate, drop_last=False, pin_memory=True)
 
 
-"""
-    ds = multiple_source_dataset(
-        dataset_class, *data_roots, balanced=True,
-        polar_hydrogens=polar_hydrogens, **ds_kwargs)
-"""
-
-
 def multiple_source_dataset(*base_paths, receptors=None, polar_hydrogens=True,
                             balanced=True, no_receptor=False, **kwargs):
     """Concatenate mulitple datasets into one, preserving balanced sampling.
@@ -61,7 +54,7 @@ def multiple_source_dataset(*base_paths, receptors=None, polar_hydrogens=True,
         if base_path is not None:
             dataset = SynthPharmDataset(
                 base_path, receptors=receptors, polar_hydrogens=polar_hydrogens,
-                no_receptor=False, **kwargs)
+                no_receptor=no_receptor, **kwargs)
             labels += list(dataset.labels)
             filenames += dataset.filenames
             datasets.append(dataset)
