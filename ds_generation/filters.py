@@ -135,7 +135,10 @@ def sample_from_pharmacophores(
         total_lig_pharms = num_ligand_pharmacophores['Donor'] + \
                            num_ligand_pharmacophores['Acceptor']
 
-        num_to_sample = int(num_opportunities / total_lig_pharms)
+        if total_lig_pharms > 0:
+            num_to_sample = int(num_opportunities / total_lig_pharms)
+        else:
+            num_to_sample = np.random.randint(0, num_opportunities)
 
     if num_to_sample > pharm_mol.GetNumHeavyAtoms():
         return pharm_mol  # return all the atoms
