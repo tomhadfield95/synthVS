@@ -11,7 +11,7 @@ import os
 import numpy as np
 import pandas as pd
 from pathos.multiprocessing import ProcessingPool as Pool
-from point_vs.utils import expand_path, mkdir, save_yaml, pretify_dict
+from point_vs.utils import expand_path, mkdir, save_yaml, pretify_dict, format_time, Timer
 from rdkit import Chem
 
 from filters import sample_from_pharmacophores, \
@@ -64,7 +64,6 @@ def the_full_monty(
         lig_mol, randomly_sampled_subset, threshold=distance_threshold)
     ligand_df = rdmol_to_dataframe(ligand)
     pharmacophore_df = rdmol_to_dataframe(pharmacophore)
-    print(label)
     return ligand_df, pharmacophore_df, label
 
 
@@ -121,24 +120,28 @@ def main(args):
     print('Generating pharmacophores')
     if args.use_multiprocessing:
         print('Using multiprocessing with {} cpus'.format(mp.cpu_count()))
-        mp_full_monty(mols,
-                      lig_output_dir,
-                      pharm_output_dir,
-                      args.max_pharmacophores,
-                      args.area_coef,
-                      args.mean_pharmacophores,
-                      args.num_opportunities,
-                      args.distance_threshold)
+        with Timer() as t:
+            mp_full_monty(mols,
+                          lig_output_dir,
+                          pharm_output_dir,
+                          args.max_pharmacophores,
+                          args.area_coef,
+                          args.mean_pharmacophores,
+                          args.num_opportunities,
+                          args.distance_threshold)
     else:
-        results = [
-            the_full_monty(
-                mol, args.max_pharmacophores, args.area_coef,
-                args.distance_threshold, args.mean_pharmacophores,
-                args.num_opportunities)
-            for mol in mols]
-        labels = save_dfs_and_get_label_dict(
-            results, pharm_output_dir, lig_output_dir)
-        save_yaml(labels, output_dir / 'labels.yaml')
+        with Timer() as t:
+            results = [
+                the_full_monty(
+                    mol, args.max_pharmacophores, args.area_coef,
+                    args.distance_threshold, args.mean_pharmacophores,
+                    args.num_opportunities)
+                for mol in mols]
+            labels = save_dfs_and_get_label_dict(
+                results, pharm_output_dir, lig_output_dir)
+            save_yaml(labels, output_dir / 'labels.yaml')
+    print('Runtime for {0} molecules: {1}'.format(
+        len(mols), format_time(t.interval)))
 
 
 if __name__ == '__main__':

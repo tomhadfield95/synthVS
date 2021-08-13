@@ -2,11 +2,7 @@ import numpy as np
 from rdkit import Chem
 
 
-def define_box_around_ligand(mol, slack=5):
-    # Get Atom Positions
-    conf = mol.GetConformer()
-    positions = np.array(
-        [np.array(conf.GetAtomPosition(i)) for i in range(mol.GetNumAtoms())])
+def define_box_around_ligand(positions, slack=5):
 
     x_min, x_max = min(positions[:, 0]) - slack, max(positions[:, 0]) + slack
     y_min, y_max = min(positions[:, 1]) - slack, max(positions[:, 1]) + slack
@@ -15,12 +11,13 @@ def define_box_around_ligand(mol, slack=5):
     return {'X': [x_min, x_max], 'Y': [y_min, y_max], 'Z': [z_min, z_max]}
 
 
-def sample_pharmacophores_box(mol, pharm_dict=None):
+def sample_pharmacophores_box(positions, pharm_dict=None):
     if pharm_dict is None:
         pharm_dict = {0: 'Acceptor', 1: 'Donor', 2: 'Hydrophobe'}
-    # Increasing diagonal elements on cov matrix increases dispersion from ligand atom
+    # Increasing diagonal elements on cov matrix increases dispersion from
+    # ligand atom
 
-    box_params = define_box_around_ligand(mol)
+    box_params = define_box_around_ligand(positions)
 
     # sample random pharmacophore type
     # FOR NOW WE WON'T THINK ABOUT HYDROPHOBIC INTERACTIONS AND JUST CONSIDER
@@ -42,7 +39,12 @@ def create_pharmacophore_mol_by_area(mol, area_coef=0.25):
     # Want the number of pharmacophores to be proportional to the area of the
     # box around the ligand
 
-    box_params = define_box_around_ligand(mol)
+    # Get Atom Positions
+    conf = mol.GetConformer()
+    positions = np.array(
+        [np.array(conf.GetAtomPosition(i)) for i in range(mol.GetNumAtoms())])
+
+    box_params = define_box_around_ligand(positions)
     box_area = (box_params['X'][1] - box_params['X'][0]) *\
                (box_params['Y'][1] - box_params['Y'][0]) * (
             box_params['Z'][1] - box_params['Z'][0])
@@ -53,8 +55,12 @@ def create_pharmacophore_mol_by_area(mol, area_coef=0.25):
     pharm_mol = Chem.RWMol()
     positions = []
 
+    # Get Atom Positions
+    conf = mol.GetConformer()
+    orig_positions = np.array(
+        [np.array(conf.GetAtomPosition(i)) for i in range(mol.GetNumAtoms())])
     for i in range(num_pharmacophores):
-        pos, pharm_type = sample_pharmacophores_box(mol)
+        pos, pharm_type = sample_pharmacophores_box(orig_positions)
         pharm_mol = add_pharm_atom(pharm_mol, pharm_type)
         positions.append(pos)
 
