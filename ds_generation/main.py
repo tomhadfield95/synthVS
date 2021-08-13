@@ -50,9 +50,9 @@ def rdmol_to_dataframe(mol):
 
 
 def the_full_monty(
-        lig_mol, max_pharmacophores, distance_threshold, poisson_mean,
-        num_opportunities):
-    pharm_mol = create_pharmacophore_mol(lig_mol, max_pharmacophores)
+        lig_mol, max_pharmacophores, area_coef,
+        distance_threshold, poisson_mean, num_opportunities):
+    pharm_mol = create_pharmacophore_mol(lig_mol, max_pharmacophores, area_coef)
     filtered_by_pharm_lig_dist = pharm_ligand_distance_filter(
         lig_mol, pharm_mol, threshold=2)
     filtered_by_pharm_pharm_dist = pharm_pharm_distance_filter(
@@ -64,12 +64,24 @@ def the_full_monty(
         lig_mol, randomly_sampled_subset, threshold=distance_threshold)
     ligand_df = rdmol_to_dataframe(ligand)
     pharmacophore_df = rdmol_to_dataframe(pharmacophore)
+    print(label)
     return ligand_df, pharmacophore_df, label
 
 
+def save_dfs_and_get_label_dict(results, pharm_output_dir, lig_output_dir):
+    labels = {}
+    for i in range(len(results)):
+        pharm_fname = pharm_output_dir / 'pharm{}.parquet'.format(i)
+        lig_fname = lig_output_dir / 'lig{}.parquet'.format(i)
+        results[i][0].to_parquet(lig_fname)
+        results[i][1].to_parquet(pharm_fname)
+        labels[i] = results[i][2]
+    return labels
+
+
 def mp_full_monty(lig_mols, lig_output_dir, pharm_output_dir,
-                  max_pharmacophores, poisson_mean, num_opportunities,
-                  distance_thresholds):
+                  max_pharmacophores, area_coef,
+                  poisson_mean, num_opportunities, distance_thresholds):
     lig_output_dir = mkdir(lig_output_dir)
     pharm_output_dir = mkdir(pharm_output_dir)
     n = len(lig_mols)
@@ -81,24 +93,21 @@ def mp_full_monty(lig_mols, lig_output_dir, pharm_output_dir,
         distance_thresholds = [distance_thresholds] * n
     if not isinstance(num_opportunities, (list, tuple)):
         num_opportunities = [num_opportunities] * n
+    if not isinstance(area_coef, (list, tuple)):
+        area_coef = [area_coef] * n
 
     results = Pool().map(
-        the_full_monty, lig_mols, max_pharmacophores, distance_thresholds,
-        poisson_mean, num_opportunities)
-
-    labels = {}
-    for i in range(len(results)):
-        pharm_fname = pharm_output_dir / 'pharm{}.parquet'.format(i)
-        lig_fname = lig_output_dir / 'lig{}.parquet'.format(i)
-        results[i][0].to_parquet(lig_fname)
-        results[i][1].to_parquet(pharm_fname)
-        labels[i] = results[i][2]
+        the_full_monty, lig_mols, max_pharmacophores, area_coef,
+        distance_thresholds, poisson_mean, num_opportunities)
+    labels = save_dfs_and_get_label_dict(results, pharm_output_dir, lig_output_dir)
     save_yaml(labels, lig_output_dir.parent / 'labels.yaml')
 
 
 def main(args):
     sdf_loc = expand_path(args.ligands)
     output_dir = mkdir(args.output_dir)
+    lig_output_dir = mkdir(output_dir / 'ligands')
+    pharm_output_dir = mkdir(output_dir / 'pharmacophores')
 
     # can also use a directory full of individual SDF files
     print('Loading input mols')
@@ -112,48 +121,23 @@ def main(args):
     print('Generating pharmacophores')
     if args.use_multiprocessing:
         print('Using multiprocessing with {} cpus'.format(mp.cpu_count()))
-        print(len(mols))
         mp_full_monty(mols,
-                      output_dir / 'ligands',
-                      output_dir / 'pharmacophores',
+                      lig_output_dir,
+                      pharm_output_dir,
                       args.max_pharmacophores,
+                      args.area_coef,
                       args.mean_pharmacophores,
                       args.num_opportunities,
                       args.distance_threshold)
     else:
-        lig_output_dir = mkdir(output_dir / 'ligands')
-        rec_output_dir = mkdir(output_dir / 'pharmacophores')
-        print('Generating initial pharmacophores')
-        pharm_mols = [
-            create_pharmacophore_mol(m, args.max_pharmacophores) for m in mols]
-
-        print('Applying filters')
-        filtered_by_pharm_lig_dist = [
-            pharm_ligand_distance_filter(mols[i], pharm_mols[i])
-            for i in range(len(pharm_mols))]
-
-        filtered_by_pharm_pharm_dist = [
-            pharm_pharm_distance_filter(filtered_by_pharm_lig_dist[i])
-            for i in range(len(filtered_by_pharm_lig_dist))]
-
-        randomly_sampled_subset = [
-            sample_from_pharmacophores(
-                filtered_by_pharm_pharm_dist[i], mols[i],
-                args.mean_pharmacophores, args.num_opportunities)
-            for i in range(len(filtered_by_pharm_pharm_dist))]
-
-        labels = {}
-        for i in range(len(randomly_sampled_subset)):
-            lig, pharm, label = assign_label(
-                mols[i], randomly_sampled_subset[i],
-                threshold=args.distance_threshold)
-            lig_writer = Chem.SDWriter(
-                str(lig_output_dir / 'lig{}.sdf'.format(i)))
-            pharm_writer = Chem.SDWriter(
-                str(rec_output_dir / 'pharm{}.sdf'.format(i)))
-            lig_writer.write(lig)
-            pharm_writer.write(pharm)
-            labels[i] = label
+        results = [
+            the_full_monty(
+                mol, args.max_pharmacophores, args.area_coef,
+                args.distance_threshold, args.mean_pharmacophores,
+                args.num_opportunities)
+            for mol in mols]
+        labels = save_dfs_and_get_label_dict(
+            results, pharm_output_dir, lig_output_dir)
         save_yaml(labels, output_dir / 'labels.yaml')
 
 
@@ -162,8 +146,9 @@ if __name__ == '__main__':
     parser.add_argument('ligands', type=str, help='Location of ligand sdf(s)')
     parser.add_argument('output_dir', type=str,
                         help='Directory in which to store outputs')
-    parser.add_argument('--max_pharmacophores', '-m', type=int, default=20,
+    parser.add_argument('--max_pharmacophores', '-m', type=int, default=None,
                         help='Maximum number of pharmacophores for each ligand')
+    parser.add_argument('--area_coef', '-a', type=float, default=None)
     parser.add_argument('--mean_pharmacophores', '-p', type=int, default=None,
                         help='Mean number of pharmacophores for each ligand')
     parser.add_argument('--num_opportunities', '-n', type=int, default=None,
@@ -181,6 +166,9 @@ if __name__ == '__main__':
         arguments.mean_pharmacophores)) == 1, (
         'please specifiy precisely one of mean_pharmacophores and '
         'num_opportunities')
+    assert (bool(arguments.area_coef) + bool(
+        arguments.max_pharmacophores)) == 1, (
+        'please specifiy precisely one of area_coef and max_opportunities')
 
     print()
     print('#' * os.get_terminal_size().columns)
