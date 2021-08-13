@@ -6,7 +6,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from pathos.multiprocessing import ProcessingPool as Pool
-from point_vs.utils import expand_path, load_yaml, pretify_dict
+from point_vs.utils import expand_path, load_yaml, pretify_dict, format_time, \
+    Timer
 from rdkit import Chem
 
 from filters import get_pharm_numbers
@@ -68,24 +69,23 @@ def simple_summary_stats(mols, pharm_mols, labels, cpus=1):
         inactive_ratio = get_pharm_box_ratio(df_inactives)
 
         active_stats = mol_stats(
-            ligand_atoms=round(float(np.mean(
-                [m.GetNumHeavyAtoms() for m in df_actives["mols"]])), 3),
-            pharm_atoms=round(float(np.mean(
-                [m.GetNumHeavyAtoms() for m in df_actives["pharm_mols"]])), 3),
-            ligand_donors=round(float(np.mean(donor_count_active)), 3),
-            ligand_acceptors=round(float(np.mean(acceptor_count_active)), 3),
-            pharm_box_ratio=round(float(np.mean(active_ratio)), 3)
+            ligand_atoms=np.mean(
+                [m.GetNumHeavyAtoms() for m in df_actives["mols"]]),
+            pharm_atoms=np.mean(
+                [m.GetNumHeavyAtoms() for m in df_actives["pharm_mols"]]),
+            ligand_donors=np.mean(donor_count_active),
+            ligand_acceptors=np.mean(acceptor_count_active),
+            pharm_box_ratio=np.mean(active_ratio)
         )
 
         inactive_stats = mol_stats(
-            ligand_atoms=round(float(np.mean(
-                [m.GetNumHeavyAtoms() for m in df_inactives["mols"]])), 3),
-            pharm_atoms=round(float(np.mean(
-                [m.GetNumHeavyAtoms() for m in df_inactives["pharm_mols"]])),
-                3),
-            ligand_donors=round(float(np.mean(donor_count_inactive)), 3),
-            ligand_acceptors=round(float(np.mean(acceptor_count_inactive)), 3),
-            pharm_box_ratio=round(float(np.mean(inactive_ratio)), 3)
+            ligand_atoms=np.mean(
+                [m.GetNumHeavyAtoms() for m in df_inactives["mols"]]),
+            pharm_atoms=np.mean(
+                [m.GetNumHeavyAtoms() for m in df_inactives["pharm_mols"]]),
+            ligand_donors=np.mean(donor_count_inactive),
+            ligand_acceptors=np.mean(acceptor_count_inactive),
+            pharm_box_ratio=np.mean(inactive_ratio)
         )
 
         return active_stats, inactive_stats
@@ -113,7 +113,7 @@ def simple_summary_stats(mols, pharm_mols, labels, cpus=1):
 def write_statistics(fname, lig_mols, pharm_mols, label_dict, cpus=1,
                      args_dict=None):
     def _round(x, decimals):
-        return '{{:.{}f}}'.format(decimals).format(x)
+        return '{{:.{}g}}'.format(decimals).format(x)
 
     sorted_labels = [label for _, label in sorted(
         label_dict.items(), key=lambda x: x[0])]
@@ -142,27 +142,36 @@ if __name__ == '__main__':
                         help='Location of two directories named ligands and '
                              'pharmacophores in which sdf output of '
                              'ds_generation/main.py are stored.')
-    parser.add_argument('multiprocessing', action='store_true',
+    parser.add_argument('--multiprocessing', '-mp', action='store_true',
                         help='Use multiple cpus')
     args = parser.parse_args()
 
-    sdf_root = expand_path(args.sdf_root)
-    lig_sdfs = [str(p) for p in sorted(
-        list(sdf_root.glob('ligands/*.sdf')),
-        key=lambda x: int(Path(x.name).stem[3:]))]
-    pharm_sdfs = [str(p) for p in sorted(
-        list(sdf_root.glob('pharmacophores/*.sdf')),
-        key=lambda x: int(Path(x.name).stem[5:]))]
-    labels = load_yaml(sdf_root.parent / 'labels.yaml')
+    with Timer() as t:
+        sdf_root = expand_path(args.sdf_root)
+        lig_sdfs = [str(p) for p in sorted(
+            list(sdf_root.glob('ligands/*.sdf')),
+            key=lambda x: int(Path(x.name).stem[3:]))]
+        pharm_sdfs = [str(p) for p in sorted(
+            list(sdf_root.glob('pharmacophores/*.sdf')),
+            key=lambda x: int(Path(x.name).stem[5:]))]
+        labels = load_yaml(sdf_root.parent / 'labels.yaml')
 
-    assert len(pharm_sdfs) == len(lig_sdfs), (
-        'Number of pharmacophores files must equal the number of ligand files')
-    assert len(labels) == len(lig_sdfs), (
-        'Number of labels must equal the number of input files')
+        assert len(pharm_sdfs) == len(lig_sdfs), (
+            'Number of pharmacophores files must equal the number of ligand '
+            'files')
+        assert len(labels) == len(lig_sdfs), (
+            'Number of labels must equal the number of input files ({0} '
+            'vs {1})'.format(len(labels), len(lig_sdfs)))
 
-    lig_mols = [Chem.SDMolSupplier(sdf_file)[0] for sdf_file in lig_sdfs]
-    pharm_mols = [Chem.SDMolSupplier(sdf_file)[0] for sdf_file in pharm_sdfs]
+        lig_mols = [Chem.SDMolSupplier(sdf_file)[0] for sdf_file in lig_sdfs]
+        pharm_mols = [Chem.SDMolSupplier(sdf_file)[0] for sdf_file in
+                      pharm_sdfs]
 
-    cpus = mp.cpu_count() if args.multiprocessing else 1
-    print(write_statistics(
-        sdf_root.parent / 'stats.txt', lig_mols, pharm_mols, labels, cpus=cpus))
+        cpus = mp.cpu_count() if args.multiprocessing else 1
+    print('Runtime for data loading and preparation:', format_time(t.interval))
+    with Timer() as t:
+        print(write_statistics(
+            sdf_root.parent / 'stats.txt',
+            lig_mols, pharm_mols, labels, cpus=cpus))
+    print()
+    print('Runtime for gathering statistics:', format_time(t.interval))
