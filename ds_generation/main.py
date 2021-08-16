@@ -7,6 +7,7 @@ written by, Tom Hadfield.
 import argparse
 import multiprocessing as mp
 import os
+from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -16,11 +17,11 @@ from point_vs.utils import expand_path, mkdir, save_yaml, pretify_dict, \
     format_time, Timer
 from rdkit import Chem
 
-from stats import write_statistics
 from filters import sample_from_pharmacophores, \
     pharm_pharm_distance_filter, pharm_ligand_distance_filter
 from generate import create_pharmacophore_mol
-from label import assign_label
+from label import assign_mol_label
+from stats import write_statistics
 
 
 def rdmol_to_dataframe(mol):
@@ -60,18 +61,19 @@ def the_full_monty(
         lig_mol, pharm_mol, threshold=2)
     filtered_by_pharm_pharm_dist = pharm_pharm_distance_filter(
         filtered_by_pharm_lig_dist)
-    randomly_sampled_subset = sample_from_pharmacophores(
+    pharmacophore = sample_from_pharmacophores(
         filtered_by_pharm_pharm_dist, lig_mol, poisson_mean=poisson_mean,
         num_opportunities=num_opportunities)
-    ligand, pharmacophore, label = assign_label(
-        lig_mol, randomly_sampled_subset, threshold=distance_threshold)
-    ligand_df = rdmol_to_dataframe(ligand)
+    positive_coords = assign_mol_label(
+        lig_mol, pharmacophore, threshold=distance_threshold)
+    ligand_df = rdmol_to_dataframe(lig_mol)
     pharmacophore_df = rdmol_to_dataframe(pharmacophore)
-    return ligand, pharmacophore, ligand_df, pharmacophore_df, label
+    return lig_mol, pharmacophore, ligand_df, pharmacophore_df, positive_coords
 
 
-def save_dfs_and_get_label_dict(results, output_dir):
+def save_dfs_and_get_labels(results, output_dir):
     labels = {}
+    atom_labels = defaultdict(list)
     lig_df_output_dir = mkdir(output_dir, 'parquets', 'ligands')
     pharm_df_output_dir = mkdir(output_dir, 'parquets', 'pharmacophores')
     lig_sdf_output_dir = mkdir(output_dir, 'sdf', 'ligands')
@@ -90,9 +92,12 @@ def save_dfs_and_get_label_dict(results, output_dir):
         pharm_writer.write(results[i][1])
         results[i][2].to_parquet(lig_df_fname)
         results[i][3].to_parquet(pharm_df_fname)
-        labels[i] = results[i][-1]
 
-    return labels
+        positive_positions = results[i][-1]
+        labels[i] = int(len(positive_positions) > 0)
+        atom_labels[i] += positive_positions
+
+    return labels, atom_labels
 
 
 def mp_full_monty(lig_mols, output_dir,
@@ -150,12 +155,13 @@ def main(args):
                     args.num_opportunities)
                 for mol in mols]
         cpus = 1
-    labels = save_dfs_and_get_label_dict(results, output_dir)
+    labels, atom_labels = save_dfs_and_get_labels(results, output_dir)
     save_yaml(labels, output_dir / 'labels.yaml')
     print('Fraction of positive examples: {:.3f}'.format(
         sum(labels.values()) / len(labels)))
     print('Runtime for generating {0} fake receptors: {1}'.format(
         len(mols), format_time(t.interval)))
+    save_yaml(atom_labels, output_dir / 'atomic_labels.yaml')
 
     lig_mols = [result[0] for result in results]
     pharm_mols = [result[1] for result in results]
