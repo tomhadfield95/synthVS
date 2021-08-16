@@ -1,9 +1,9 @@
 import argparse
+import faulthandler
 from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
-from pathos.multiprocessing import ProcessingPool as Pool
 from point_vs.utils import expand_path, save_yaml
 from rdkit import RDConfig, Chem
 from rdkit.Chem import ChemicalFeatures
@@ -12,9 +12,19 @@ FACTORY = ChemicalFeatures.BuildFeatureFactory(
     str(Path(RDConfig.RDDataDir, 'BaseFeatures.fdef')))
 
 
-def assign_mol_label(ligand, pharm_mol, threshold=3.5, idx=None):
-    """If there is a pharmacophore within the threshold of a matching ligand
-    pharmacophore, then we return a label of 1 else 0"""
+def assign_mol_label(ligand, pharm_mol, threshold=3.5, fname_idx=None):
+    """Assign the labels 0 or 1 to atoms in the pharm/ligand molecules.
+
+    If there is a receptor pharmacophore within the threshold of a matching
+    ligand pharmacophore, the class of the atom is 1. If not, it is zero.
+
+    Arguments:
+        ligand: RDKit mol object (ligand molecule)
+        pharm_mol: RDKit mol object (fake receptor pharmacophores)
+        threshold: cutoff for interaction distance which is considered an active
+            interaction
+        fname_idx: index of ligand and pharm_mol sdf in directory (if supplied)
+    """
 
     def vec_to_vec_dist(p1, p2):
         return np.linalg.norm(p1 - p2)
@@ -22,7 +32,10 @@ def assign_mol_label(ligand, pharm_mol, threshold=3.5, idx=None):
     def get_pharm_indices(mol):
         pharms = ['Hydrophobe', 'Donor', 'Acceptor', 'LumpedHydrophobe']
         pharms_idx_dict = defaultdict(list)
+        if mol.GetNumAtoms() < 1:
+            return pharms_idx_dict
 
+        mol.AddConformer(mol.GetConformer())
         feats = FACTORY.GetFeaturesForMol(mol)
         for feat in feats:
             if feat.GetFamily() in pharms:
@@ -31,9 +44,8 @@ def assign_mol_label(ligand, pharm_mol, threshold=3.5, idx=None):
         return pharms_idx_dict
 
     if pharm_mol is None:
-        print('pharm_mol is None', idx)
-        if idx is not None:
-            return idx, []
+        if fname_idx is not None:
+            return fname_idx, []
         return []
 
     ligand_pharms_indices = get_pharm_indices(ligand)
@@ -45,32 +57,29 @@ def assign_mol_label(ligand, pharm_mol, threshold=3.5, idx=None):
                 np.array(ligand.GetConformer().GetAtomPosition(idx)))
 
     positive_coords = []
-    for atom in pharm_mol.GetAtoms():
+    for idx, atom in enumerate(pharm_mol.GetAtoms()):
         atom_pos = np.array(
-            pharm_mol.GetConformer().GetAtomPosition(atom.GetIdx()))
-        if atom.GetSymbol() == 'C':
-            raise
+            pharm_mol.GetConformer().GetAtomPosition(idx))
         for atomic_symbol, ligand_pharm_positions in zip(('C', 'O', 'N'), zip(
                 ligand_pharms_positions['Hydrophobe'] +
                 ligand_pharms_positions['LumpedHydrophobe'],
                 ligand_pharms_positions['Acceptor'],
                 ligand_pharms_positions['Donor'])):
             if atom.GetSymbol() == atomic_symbol:
-                if atomic_symbol not in ('O', 'N'):
-                    raise
                 for ligand_pharm_position in ligand_pharm_positions:
                     if vec_to_vec_dist(
                             ligand_pharm_position, atom_pos) < threshold:
                         positive_coords.append(ligand_pharm_position)
                         positive_coords.append(atom_pos)
 
-    print(idx)
-    if idx is not None:
-        return idx, positive_coords
+    if fname_idx is not None:
+        return fname_idx, positive_coords
     return positive_coords
 
 
 def label_dataset(root, threshold):
+    """Use multiprocssing to post-facto label atoms and mols in sdf dataset."""
+    faulthandler.enable()
     root = expand_path(root)
     mol_labels = {}
     coords_with_positive_label = {}
@@ -83,13 +92,19 @@ def label_dataset(root, threshold):
         indices.append(idx)
     print('SDFs loaded.')
     thresholds = [threshold] * len(indices)
-    results = Pool().map(
-        assign_mol_label, lig_mols, pharm_mols, thresholds, indices)
+    results = []
+    for lig_mol, pharm_mol, threshold, idx in zip(
+            lig_mols, pharm_mols, thresholds, indices):
+        print(idx)
+        results.append(assign_mol_label(lig_mol, pharm_mol, threshold, idx))
+    # results = Pool().map(
+    #    assign_mol_label, lig_mols, pharm_mols, thresholds, indices)
     print('SDFs processed.')
     for res in results:
         idx = res[0]
         positive_coords = res[1]
-        coords_with_positive_label[idx] = positive_coords
+        coords_with_positive_label[idx] = [
+            list(coords) for coords in positive_coords]
         mol_labels[idx] = int(len(positive_coords) > 0)
     print('Results constructed.')
     return coords_with_positive_label, mol_labels
