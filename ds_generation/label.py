@@ -93,11 +93,6 @@ def label_dataset(root, threshold):
         indices.append(idx)
     print('SDFs loaded.')
     thresholds = [threshold] * len(indices)
-    results = []
-    # for lig_mol, pharm_mol, threshold, idx in zip(
-    #        lig_mols, pharm_mols, thresholds, indices):
-    #    print(idx)
-    #    results.append(assign_mol_label(lig_mol, pharm_mol, threshold, idx))
     results = Pool().map(
         assign_mol_label, lig_mols, pharm_mols, thresholds, indices)
     print('SDFs processed.')
@@ -105,7 +100,7 @@ def label_dataset(root, threshold):
         idx = res[0]
         positive_coords = res[1]
         coords_with_positive_label[idx] = [
-            list(coords) for coords in positive_coords]
+            [float(i) for i in coords] for coords in positive_coords]
         mol_labels[idx] = int(len(positive_coords) > 0)
     print('Results constructed.')
     return coords_with_positive_label, mol_labels
