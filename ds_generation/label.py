@@ -4,6 +4,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+from pathos.multiprocessing import ProcessingPool as Pool
 from point_vs.utils import expand_path, save_yaml
 from rdkit import RDConfig, Chem
 from rdkit.Chem import ChemicalFeatures
@@ -93,12 +94,12 @@ def label_dataset(root, threshold):
     print('SDFs loaded.')
     thresholds = [threshold] * len(indices)
     results = []
-    for lig_mol, pharm_mol, threshold, idx in zip(
-            lig_mols, pharm_mols, thresholds, indices):
-        print(idx)
-        results.append(assign_mol_label(lig_mol, pharm_mol, threshold, idx))
-    # results = Pool().map(
-    #    assign_mol_label, lig_mols, pharm_mols, thresholds, indices)
+    # for lig_mol, pharm_mol, threshold, idx in zip(
+    #        lig_mols, pharm_mols, thresholds, indices):
+    #    print(idx)
+    #    results.append(assign_mol_label(lig_mol, pharm_mol, threshold, idx))
+    results = Pool().map(
+        assign_mol_label, lig_mols, pharm_mols, thresholds, indices)
     print('SDFs processed.')
     for res in results:
         idx = res[0]
