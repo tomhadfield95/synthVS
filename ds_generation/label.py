@@ -57,25 +57,53 @@ def assign_mol_label(ligand, pharm_mol, threshold=3.5, fname_idx=None):
             ligand_pharms_positions[k].append(
                 np.array(ligand.GetConformer().GetAtomPosition(idx)))
 
+    """
+    positive_coords = PositionLookup()
+    min_distances_to_pharms = []
+    """
     positive_coords = []
     for idx, atom in enumerate(pharm_mol.GetAtoms()):
         atom_pos = np.array(
             pharm_mol.GetConformer().GetAtomPosition(idx))
-        for atomic_symbol, ligand_pharm_positions in zip(('C', 'O', 'N'), zip(
-                ligand_pharms_positions['Hydrophobe'] +
-                ligand_pharms_positions['LumpedHydrophobe'],
-                ligand_pharms_positions['Acceptor'],
-                ligand_pharms_positions['Donor'])):
+        for atomic_symbol, ligand_pharm_positions in zip(
+                ('C', 'O', 'N'), (ligand_pharms_positions['Hydrophobe'] +
+                                  ligand_pharms_positions['LumpedHydrophobe'],
+                                  ligand_pharms_positions['Acceptor'],
+                                  ligand_pharms_positions['Donor'])):
             if atom.GetSymbol() == atomic_symbol:
                 for ligand_pharm_position in ligand_pharm_positions:
-                    if vec_to_vec_dist(
-                            ligand_pharm_position, atom_pos) < threshold:
+                    dist = vec_to_vec_dist(ligand_pharm_position, atom_pos)
+                    if dist < threshold:
                         positive_coords.append(ligand_pharm_position)
                         positive_coords.append(atom_pos)
-
     if fname_idx is not None:
         return fname_idx, positive_coords
     return positive_coords
+    # noinspection PyUnreachableCode
+    """
+                    if ligand_pharm_position not in positive_coords:
+                        positive_coords.append(ligand_pharm_position)
+                        min_distances_to_pharms.append(dist)
+                    else:
+                        min_distances_to_pharms[
+                            positive_coords.index(ligand_pharm_position)] 
+                            = min(
+                            dist, min_distances_to_pharms[
+                            positive_coords.index(
+                                ligand_pharm_position)])
+                    if atom_pos not in positive_coords:
+                        positive_coords.append(ligand_pharm_position)
+                        min_distances_to_pharms.append(dist)
+                    else:
+                        min_distances_to_pharms[
+                            positive_coords.index(atom_pos)] = min(
+                            dist, min_distances_to_pharms[
+                            positive_coords.index(
+                                atom_pos)])
+    if fname_idx is not None:
+        return fname_idx, positive_coords, min_distances_to_pharms
+    return positive_coords, min_distances_to_pharms    
+    """
 
 
 def label_dataset(root, threshold):
