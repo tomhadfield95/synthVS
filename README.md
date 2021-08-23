@@ -6,13 +6,13 @@ The only requirement for this project is
 this requirement can be found below:
 
 ```
-git clone git@github.com/jscant/PointVS
+git clone git@github.com:jscant/PointVS
 cd PointVS
 conda env create -f environment.yml python=3.8
 conda activate pointvs
 pip install -e .
 cd ..
-git clone git@github.com/jscant/SynthPharm
+git clone git@github.com:jscant/SynthPharm
 cd SynthPharm
 pip install -e . -vvv
 ```
