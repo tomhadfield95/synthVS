@@ -55,7 +55,7 @@ def rdmol_to_dataframe(mol):
 
 def the_full_monty(
         lig_mol, max_pharmacophores, area_coef,
-        distance_threshold, poisson_mean, num_opportunities):
+        distance_threshold, poisson_mean, num_opportunities, force_label=None):
     pharm_mol = create_pharmacophore_mol(lig_mol, max_pharmacophores, area_coef)
     filtered_by_pharm_lig_dist = pharm_ligand_distance_filter(
         lig_mol, pharm_mol, threshold=2)
@@ -64,8 +64,22 @@ def the_full_monty(
     pharmacophore = sample_from_pharmacophores(
         filtered_by_pharm_pharm_dist, lig_mol, poisson_mean=poisson_mean,
         num_opportunities=num_opportunities)
-    positive_coords = assign_mol_label(
-        lig_mol, pharmacophore, threshold=distance_threshold)
+    positive_coords = []
+    if force_label is None:
+        positive_coords = assign_mol_label(
+            lig_mol, pharmacophore, threshold=distance_threshold)
+    else:
+        label = -1
+        attempts = 0
+        while label != force_label:
+            if attempts == 20:
+                print('Could not generate receptor with label {}'.format(
+                    force_label))
+                return
+            positive_coords = assign_mol_label(
+                lig_mol, pharmacophore, threshold=distance_threshold)
+            label = int(len(positive_coords) > 0)
+            attempts += 1
     ligand_df = rdmol_to_dataframe(lig_mol)
     pharmacophore_df = rdmol_to_dataframe(pharmacophore)
     return lig_mol, pharmacophore, ligand_df, pharmacophore_df, positive_coords
@@ -78,8 +92,9 @@ def save_dfs_and_get_labels(results, output_dir):
     pharm_df_output_dir = mkdir(output_dir, 'parquets', 'pharmacophores')
     lig_sdf_output_dir = mkdir(output_dir, 'sdf', 'ligands')
     pharm_sdf_output_dir = mkdir(output_dir, 'sdf', 'pharmacophores')
-
     for i in range(len(results)):
+        if results[i] is None:
+            continue
         pharm_df_fname = pharm_df_output_dir / 'pharm{}.parquet'.format(i)
         lig_df_fname = lig_df_output_dir / 'lig{}.parquet'.format(i)
 
@@ -100,9 +115,8 @@ def save_dfs_and_get_labels(results, output_dir):
     return labels, atom_labels
 
 
-def mp_full_monty(lig_mols, output_dir,
-                  max_pharmacophores, area_coef,
-                  poisson_mean, num_opportunities, distance_thresholds):
+def mp_full_monty(lig_mols, max_pharmacophores, area_coef, poisson_mean,
+                  num_opportunities, distance_thresholds, labels):
     n = len(lig_mols)
     if not isinstance(max_pharmacophores, (list, tuple)):
         max_pharmacophores = [max_pharmacophores] * n
@@ -114,37 +128,59 @@ def mp_full_monty(lig_mols, output_dir,
         num_opportunities = [num_opportunities] * n
     if not isinstance(area_coef, (list, tuple)):
         area_coef = [area_coef] * n
+    if not isinstance(labels, (list, tuple)):
+        labels = [labels] * n
 
     results = Pool().map(
         the_full_monty, lig_mols, max_pharmacophores, area_coef,
-        distance_thresholds, poisson_mean, num_opportunities)
+        distance_thresholds, poisson_mean, num_opportunities, labels)
     return results
 
 
 def main(args):
+    def determine_label(path):
+        path = str(path)
+        if args.force_labels == 0:
+            return 0
+        elif args.force_labels == 1:
+            return 1
+        elif args.force_labels == 2:
+            if str(path).find('inactive') != -1 or \
+                    str(path).find('decoy') != -1:
+                return 0
+            elif str(path).find('active'):
+                return 1
+            else:
+                raise RuntimeError(
+                    'Correct labels could not be determined from input path.')
+        return None
+
     sdf_loc = expand_path(args.ligands)
     output_dir = mkdir(args.output_dir)
 
     # can also use a directory full of individual SDF files
     print('Loading input mols')
     if sdf_loc.is_dir():
-        sdfs = sdf_loc.glob('*.sdf')
+        sdfs = list(sdf_loc.glob('*.sdf'))
         sups = [Chem.SDMolSupplier(str(sdf)) for sdf in sdfs]
         mols = [mol for sup in sups for mol in sup]
+        labels = [determine_label(sdf) for sdf in sdfs]
     else:
         mols = [m for m in Chem.SDMolSupplier(str(sdf_loc))]
+        label = determine_label(sdf_loc)
+        labels = [label for _ in mols]
 
     print('Generating pharmacophores')
     if args.use_multiprocessing:
         print('Using multiprocessing with {} cpus'.format(mp.cpu_count()))
         with Timer() as t:
-            results = mp_full_monty(mols,
-                                    output_dir,
+            results = mp_full_monty([mol for mol in mols if mol is not None],
                                     args.max_pharmacophores,
                                     args.area_coef,
                                     args.mean_pharmacophores,
                                     args.num_opportunities,
-                                    args.distance_threshold)
+                                    args.distance_threshold,
+                                    labels)
         cpus = mp.cpu_count()
     else:
         with Timer() as t:
@@ -152,16 +188,22 @@ def main(args):
                 the_full_monty(
                     mol, args.max_pharmacophores, args.area_coef,
                     args.distance_threshold, args.mean_pharmacophores,
-                    args.num_opportunities)
-                for mol in mols]
+                    args.num_opportunities, label)
+                for label, mol in zip(labels, mols) if mol is not None]
         cpus = 1
     labels, atom_labels = save_dfs_and_get_labels(results, output_dir)
-    save_yaml(labels, output_dir / 'labels.yaml')
+    if args.force_labels != -1:
+        print('Fraction of ligands for which a label could not be forced and '
+              'which were therefore discarded: {0:.3f}'.format(
+            len([res for res in results if res is None]) / len(results)))
+    results = [res for res in results if res is not None]
+
     print('Fraction of positive examples: {:.3f}'.format(
         sum(labels.values()) / len(labels)))
     print('Runtime for generating {0} fake receptors: {1}'.format(
         len(mols), format_time(t.interval)))
     save_yaml(atom_labels, output_dir / 'atomic_labels.yaml')
+    save_yaml(labels, output_dir / 'labels.yaml')
 
     lig_mols = [result[0] for result in results]
     pharm_mols = [result[1] for result in results]
@@ -191,6 +233,14 @@ if __name__ == '__main__':
                              'groups and their respective pharmacophores for '
                              'the combination of the two to be considered an '
                              'active')
+    parser.add_argument('--force_labels', '-f', type=int, default=-1,
+                        help='Attempts to generate ligands until the desired '
+                             'label is obtained; this arg can be either 0 or '
+                             '1, which sets the label, or 2, in which case '
+                             'whether something is labelled as a binding or '
+                             'non-binding structure depends on whether the '
+                             'filename has "active" or either "inactive" or '
+                             '"decoy" in its path.')
     parser.add_argument('--use_multiprocessing', '-mp', action='store_true',
                         help='Use multiple CPU processes')
 
