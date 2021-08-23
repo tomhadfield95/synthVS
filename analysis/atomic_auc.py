@@ -196,17 +196,19 @@ def parse_parquets(lig_fname, pharm_fname, cmd_line_args, no_receptor=False):
     return df, p.float(), v.float(), m, max_ligand_feature_id
 
 
-def plot_rank_histogram(lig_ranks, rec_ranks, fname=None):
+def plot_rank_histogram(lig_ranks, rec_ranks, title=None, fname=None):
     fig, axs = plt.subplots(2, 1, sharex=True, figsize=(10, 10))
     max_rank = max(lig_ranks + rec_ranks)
-    for idx, (ranks, title) in enumerate(zip(
+    for idx, (ranks, subtitle) in enumerate(zip(
             [lig_ranks, rec_ranks], ['Ligand', 'Receptor'])):
         axs[idx].hist(ranks, density=False, bins=list(range(max_rank + 1)),
                       edgecolor='black', linewidth=1.0, color='blue')
-        axs[idx].set_title(title)
+        axs[idx].set_title(subtitle)
         axs[idx].set_xlabel('Top-scoring bonding atom rank')
         axs[idx].set_ylabel('Count')
-    fig.tight_layout()
+    # fig.tight_layout()
+    if title is not None:
+        fig.suptitle(title)
     if fname is not None:
         fname = expand_path(fname)
         mkdir(fname.parent)
@@ -240,5 +242,6 @@ if __name__ == '__main__':
         np.mean(lig_positions)))
     print('Mean top scoring bonding atom rank (receptor): {:.4f}'.format(
         np.mean(rec_positions)))
-    plot_rank_histogram(lig_positions, rec_positions,
-                        'rank_histogram_{}.png'.format(project_name))
+    plot_rank_histogram(
+        lig_positions, rec_positions, project_name,
+        'rank_histogram_{}.png'.format(project_name))
