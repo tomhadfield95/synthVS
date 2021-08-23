@@ -15,8 +15,10 @@ def vec_to_vec_dist(p1, p2):
 
 
 def pharm_ligand_distance_filter(ligand, pharm_mol, threshold=2):
-    # For each atom in the pharmMol, we want to compute the distance to each ligand atom.
-    # If a pharm atom is closer to a ligand atom than the threshold, then we remove it
+    # For each atom in the pharmMol, we want to compute the distance to each
+    # ligand atom.
+    # If a pharm atom is closer to a ligand atom than the threshold, then we
+    # remove it
 
     if pharm_mol is None or pharm_mol.GetNumHeavyAtoms() < 1:
         return None
@@ -56,9 +58,11 @@ def pharm_ligand_distance_filter(ligand, pharm_mol, threshold=2):
 
 
 def pharm_pharm_distance_filter(pharm_mol, threshold=3):
-    # For each atom in the pharmMol, we want to ensure we're not too close to any of the other atoms
+    # For each atom in the pharmMol, we want to ensure we're not too close to
+    # any of the other atoms
     # Define a list with one atom in it.
-    # For another atom, if it's further away from the atom in the list than the threshold, then add it to the list.
+    # For another atom, if it's further away from the atom in the list than
+    # the threshold, then add it to the list.
     # Otherwise discard it.
 
     pharm_mol_conf = pharm_mol.GetConformer()
@@ -130,7 +134,6 @@ def sample_from_pharmacophores(
         pharm_mol_conf = pharm_mol.GetConformer()
         pharm_mol_positions = [np.array(pharm_mol_conf.GetAtomPosition(i))
                                for i in range(pharm_mol.GetNumHeavyAtoms())]
-
         num_ligand_pharmacophores = get_pharm_numbers(ligand)
         total_lig_pharms = num_ligand_pharmacophores['Donor'] + \
                            num_ligand_pharmacophores['Acceptor']
@@ -143,13 +146,16 @@ def sample_from_pharmacophores(
     if num_to_sample > pharm_mol.GetNumHeavyAtoms():
         return pharm_mol  # return all the atoms
 
-    sample_idx = np.random.choice(list(range(pharm_mol.GetNumHeavyAtoms())), num_to_sample, False)  # Atom indices
+    # Atom indices
+    sample_idx = np.random.choice(list(
+        range(pharm_mol.GetNumHeavyAtoms())), num_to_sample, False)
 
     new_pharm_mol = Chem.RWMol()
     pharm_mol_positions_to_keep = []
 
     for idx in sample_idx:
-        new_pharm_mol.AddAtom(Chem.Atom(pharm_mol.GetAtomWithIdx(int(idx)).GetAtomicNum()))
+        new_pharm_mol.AddAtom(Chem.Atom(
+            pharm_mol.GetAtomWithIdx(int(idx)).GetAtomicNum()))
         pharm_mol_positions_to_keep.append(pharm_mol_positions[idx])
 
     # Now we want to add the coordinates to the mol
