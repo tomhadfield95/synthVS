@@ -72,6 +72,7 @@ def the_full_monty(
 
 
 def save_dfs_and_get_labels(results, output_dir):
+    """Parse and save generated RDKit molecules and return labels"""
     labels = {}
     atom_labels = defaultdict(list)
     lig_df_output_dir = mkdir(output_dir, 'parquets', 'ligands')
