@@ -2,6 +2,7 @@
 DataLoaders to take parquet directories and create feature vectors suitable
 for use by models found in this project.
 """
+import multiprocessing as mp
 from collections import defaultdict
 from pathlib import Path
 
@@ -16,75 +17,33 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 
 
 def get_data_loader(
-        *data_roots, receptors=None, batch_size=32, rot=True,
-        polar_hydrogens=True, mode='train', no_receptor=False):
+        data_root, batch_size=32, rot=True, polar_hydrogens=True, mode='train',
+        no_receptor=False):
     """Give a DataLoader from a list of receptors and data roots."""
-    ds_kwargs = {
-        'rot': rot
-    }
-    ds = multiple_source_dataset(
-        *data_roots, balanced=True, polar_hydrogens=polar_hydrogens,
-        receptors=receptors, no_receptor=no_receptor, **ds_kwargs)
+
+    def get_sampler(dataset):
+        if dataset.sample_weights is None:
+            return None
+        return WeightedRandomSampler(
+            dataset.sample_weights, len(dataset.sample_weights))
+
+    ds = SynthPharmDataset(
+        data_root, polar_hydrogens=polar_hydrogens, no_receptor=no_receptor,
+        rot=rot)
     collate = get_collate_fn(ds.feature_dim)
-    sampler = ds.sampler if mode == 'train' else None
+    sampler = get_sampler(ds) if mode == 'train' else None
     return DataLoader(
-        ds, batch_size, False, sampler=sampler,  # num_workers=mp.cpu_count(),
-        collate_fn=collate, drop_last=False, pin_memory=True)
-
-
-def multiple_source_dataset(*base_paths, receptors=None, polar_hydrogens=True,
-                            balanced=True, no_receptor=False, **kwargs):
-    """Concatenate mulitple datasets into one, preserving balanced sampling.
-
-    Arguments:
-        base_paths: locations of parquets files, one for each dataset.
-        receptors: receptors to include. If None, all receptors found are used.
-        polar_hydrogens:
-        balanced:
-
-    Returns:
-        Concatenated dataset including balanced sampler.
-    """
-    datasets = []
-    labels = []
-    filenames = []
-    base_paths = sorted(
-        [Path(bp).expanduser() for bp in base_paths if bp is not None])
-    for base_path in base_paths:
-        if base_path is not None:
-            dataset = SynthPharmDataset(
-                base_path, receptors=receptors, polar_hydrogens=polar_hydrogens,
-                no_receptor=no_receptor, **kwargs)
-            labels += list(dataset.labels)
-            filenames += dataset.filenames
-            datasets.append(dataset)
-    labels = np.array(labels)
-    active_count = np.sum(labels)
-    class_sample_count = np.array(
-        [len(labels) - active_count, active_count])
-    if np.sum(labels) == len(labels) or np.sum(labels) == 0 or not balanced:
-        sampler = None
-    else:
-        weights = 1. / class_sample_count
-        sample_weights = torch.from_numpy(
-            np.array([weights[i] for i in labels]))
-        sampler = WeightedRandomSampler(sample_weights, len(sample_weights))
-    multi_source_dataset = torch.utils.data.ConcatDataset(datasets)
-    multi_source_dataset.sampler = sampler
-    multi_source_dataset.class_sample_count = class_sample_count
-    multi_source_dataset.labels = labels
-    multi_source_dataset.filenames = filenames
-    multi_source_dataset.base_path = ', '.join([str(bp) for bp in base_paths])
-    multi_source_dataset.feature_dim = datasets[0].feature_dim
-    return multi_source_dataset
+        ds, batch_size, False, sampler=sampler,
+        num_workers=max(mp.cpu_count() - 1, 1), collate_fn=collate,
+        drop_last=False, pin_memory=True)
 
 
 class SynthPharmDataset(torch.utils.data.Dataset):
     """Class for feeding structure parquets into network."""
 
     def __init__(
-            self, base_path, polar_hydrogens=True, rot=False, receptors=None,
-            no_receptor=False, **kwargs):
+            self, base_path, polar_hydrogens=True, rot=False, no_receptor=False,
+            **kwargs):
         """Initialise dataset.
 
         Arguments:
@@ -95,7 +54,8 @@ class SynthPharmDataset(torch.utils.data.Dataset):
                 this directory are recursively loaded into the dataset.
             polar_hydrogens: include polar hydrogens as input
             rot: random rotation of inputs
-            receptors:
+            no_receptor:
+            noise:
             kwargs: keyword arguments passed to the parent class (Dataset).
         """
 
@@ -127,14 +87,11 @@ class SynthPharmDataset(torch.utils.data.Dataset):
         class_sample_count = np.array(
             [len(labels) - active_count, active_count])
         if np.sum(labels) == len(labels) or np.sum(labels) == 0:
-            self.sampler = None
+            self.sample_weights = None
         else:
             weights = 1. / class_sample_count
             self.sample_weights = torch.from_numpy(
                 np.array([weights[i] for i in labels]))
-            self.sampler = torch.utils.data.WeightedRandomSampler(
-                self.sample_weights, len(self.sample_weights)
-            )
         self.labels = labels
         print('There are', len(labels), 'training points in', base_path)
 
