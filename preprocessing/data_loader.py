@@ -3,6 +3,7 @@ DataLoaders to take parquet directories and create feature vectors suitable
 for use by models found in this project.
 """
 import multiprocessing as mp
+import random
 from collections import defaultdict
 from pathlib import Path
 
@@ -17,8 +18,8 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 
 
 def get_data_loader(
-        data_root, batch_size=32, rot=True, polar_hydrogens=True, mode='train',
-        no_receptor=False):
+        data_root, mode='train', batch_size=32, rot=True, polar_hydrogens=True,
+        noise=None, no_receptor=False):
     """Give a DataLoader from a list of receptors and data roots."""
 
     def get_sampler(dataset):
@@ -29,7 +30,7 @@ def get_data_loader(
 
     ds = SynthPharmDataset(
         data_root, polar_hydrogens=polar_hydrogens, no_receptor=no_receptor,
-        rot=rot)
+        noise=noise, rot=rot)
     collate = get_collate_fn(ds.feature_dim)
     sampler = get_sampler(ds) if mode == 'train' else None
     return DataLoader(
@@ -43,7 +44,7 @@ class SynthPharmDataset(torch.utils.data.Dataset):
 
     def __init__(
             self, base_path, polar_hydrogens=True, rot=False, no_receptor=False,
-            **kwargs):
+            noise=None, **kwargs):
         """Initialise dataset.
 
         Arguments:
@@ -54,14 +55,16 @@ class SynthPharmDataset(torch.utils.data.Dataset):
                 this directory are recursively loaded into the dataset.
             polar_hydrogens: include polar hydrogens as input
             rot: random rotation of inputs
-            no_receptor:
-            noise:
+            no_receptor: do not include receptor information
+            noise: the probability of an incorrect label being applied to a
+                training example
             kwargs: keyword arguments passed to the parent class (Dataset).
         """
 
         super().__init__(**kwargs)
         self.base_path = Path(base_path).expanduser()
         self.no_receptor = no_receptor
+        self.noise = noise
 
         if not self.base_path.exists():
             raise FileNotFoundError(
@@ -138,6 +141,12 @@ class SynthPharmDataset(torch.utils.data.Dataset):
 
         lig_fname = self.filenames[item]
         label = self.labels[item]
+
+        # with a probability of <noise>, give an incorrect label
+        if self.noise is not None:
+            if random.random() < self.noise:
+                label = 1 - label
+
         mol_idx = str(Path(lig_fname.name).stem).split('lig')[-1]
         pharm_fname = Path(
             self.base_path, 'pharmacophores', 'pharm{}.parquet'.format(mol_idx))

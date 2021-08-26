@@ -94,6 +94,7 @@ if __name__ == '__main__':
         args.train_data_root,
         batch_size=args.batch_size, rot=False,
         polar_hydrogens=args.hydrogens,
+        noise=args.noise,
         no_receptor=args.no_receptor)
 
     # Is a validation set specified?

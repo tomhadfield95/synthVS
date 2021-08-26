@@ -102,4 +102,7 @@ def parse_args():
     parser.add_argument('--no_receptor', action='store_true',
                         help='Do not include receptor information during '
                              'training/testing')
+    parser.add_argument('--noise', type=float, default=None,
+                        help='Probability of assigning the wrong label to a '
+                             'training example')
     return parser.parse_args()
