@@ -16,12 +16,16 @@ from pathos.multiprocessing import ProcessingPool as Pool
 from point_vs.utils import expand_path, mkdir, save_yaml, pretify_dict, \
     format_time, Timer
 from rdkit import Chem
+from rdkit import RDLogger
 
 from filters import sample_from_pharmacophores, \
     pharm_pharm_distance_filter, pharm_ligand_distance_filter
 from generate import create_pharmacophore_mol
 from label import assign_mol_label
 from stats import write_statistics
+
+lg = RDLogger.logger()
+lg.setLevel(RDLogger.CRITICAL)
 
 
 def rdmol_to_dataframe(mol):
@@ -72,9 +76,7 @@ def the_full_monty(
         label = -1
         attempts = 0
         while label != force_label:
-            if attempts == 20:
-                print('Could not generate receptor with label {}'.format(
-                    force_label))
+            if attempts == 100:
                 return
             positive_coords = assign_mol_label(
                 lig_mol, pharmacophore, threshold=distance_threshold)
