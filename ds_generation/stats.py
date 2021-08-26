@@ -68,25 +68,43 @@ def simple_summary_stats(mols, pharm_mols, labels, cpus=1):
         active_ratio = get_pharm_box_ratio(df_actives)
         inactive_ratio = get_pharm_box_ratio(df_inactives)
 
-        active_stats = mol_stats(
-            ligand_atoms=np.mean(
-                [m.GetNumHeavyAtoms() for m in df_actives["mols"]]),
-            pharm_atoms=np.mean(
-                [m.GetNumHeavyAtoms() for m in df_actives["pharm_mols"]]),
-            ligand_donors=np.mean(donor_count_active),
-            ligand_acceptors=np.mean(acceptor_count_active),
-            pharm_box_ratio=np.mean(active_ratio)
-        )
+        if len(df_actives['mols']):
+            active_stats = mol_stats(
+                ligand_atoms=np.mean(
+                    [m.GetNumHeavyAtoms() for m in df_actives["mols"]]),
+                pharm_atoms=np.mean(
+                    [m.GetNumHeavyAtoms() for m in df_actives["pharm_mols"]]),
+                ligand_donors=np.mean(donor_count_active),
+                ligand_acceptors=np.mean(acceptor_count_active),
+                pharm_box_ratio=np.mean(active_ratio)
+            )
+        else:
+            active_stats = mol_stats(
+                ligand_atoms=-1,
+                pharm_atoms=-1,
+                ligand_donors=-1,
+                ligand_acceptors=-1,
+                pharm_box_ratio=-1
+            )
 
-        inactive_stats = mol_stats(
-            ligand_atoms=np.mean(
-                [m.GetNumHeavyAtoms() for m in df_inactives["mols"]]),
-            pharm_atoms=np.mean(
-                [m.GetNumHeavyAtoms() for m in df_inactives["pharm_mols"]]),
-            ligand_donors=np.mean(donor_count_inactive),
-            ligand_acceptors=np.mean(acceptor_count_inactive),
-            pharm_box_ratio=np.mean(inactive_ratio)
-        )
+        if len(df_inactives['mols']):
+            inactive_stats = mol_stats(
+                ligand_atoms=np.mean(
+                    [m.GetNumHeavyAtoms() for m in df_inactives["mols"]]),
+                pharm_atoms=np.mean(
+                    [m.GetNumHeavyAtoms() for m in df_inactives["pharm_mols"]]),
+                ligand_donors=np.mean(donor_count_inactive),
+                ligand_acceptors=np.mean(acceptor_count_inactive),
+                pharm_box_ratio=np.mean(inactive_ratio)
+            )
+        else:
+            inactive_stats = mol_stats(
+                ligand_atoms=-1,
+                pharm_atoms=-1,
+                ligand_donors=-1,
+                ligand_acceptors=-1,
+                pharm_box_ratio=-1
+            )
 
         return active_stats, inactive_stats
 
