@@ -100,7 +100,7 @@ def pharm_pharm_distance_filter(pharm_mol, threshold=3):
 
 
 def sample_from_pharmacophores(
-        pharm_mol, ligand=None, poisson_mean=None, num_opportunities=None):
+        pharm_mol, ligand=None, poisson_mean=None, num_opportunities=None, hydrophobic = False):
     """Sample from the filtered pharmacophores to get the desired distribution.
 
     Either sample from a poisson distribution, or such that the number of
@@ -137,6 +137,11 @@ def sample_from_pharmacophores(
         num_ligand_pharmacophores = get_pharm_numbers(ligand)
         total_lig_pharms = num_ligand_pharmacophores['Donor'] + \
                            num_ligand_pharmacophores['Acceptor']
+                           
+        if hydrophobic:
+            total_lig_pharms += num_ligand_pharmacophores['Hydrophobe']
+            #total_lig_pharms += num_ligand_pharmacophores['LumpedHydrophobe']
+                           
 
         if total_lig_pharms > 0:
             num_to_sample = int(num_opportunities / total_lig_pharms)
@@ -168,9 +173,9 @@ def sample_from_pharmacophores(
 
     return new_pharm_mol
 
-
+'''
 def get_pharm_numbers(mol):
-    pharm_counts = {'Acceptor': 0, 'Donor': 0}
+    pharm_counts = {'Acceptor': 0, 'Donor': 0, 'Hydrophobe': 0, 'LumpedHydrophobe': 0}
     feats = FACTORY.GetFeaturesForMol(mol)
     proc_feats = []
     for feat in feats:
@@ -181,3 +186,25 @@ def get_pharm_numbers(mol):
         pharm_counts[p] += 1
 
     return pharm_counts
+'''
+
+#Updated get_pharm_numbers because before ligands with aromatic groups were getting more opportunities than those without
+#a lumped hydrophobe was counted once in terms of determining the number of protein pharmacophores, but multiple times when 
+#calculating the interaction score
+
+def get_pharm_numbers(mol):
+    pharm_counts = {'Acceptor': 0, 'Donor': 0, 'Hydrophobe': 0, 'LumpedHydrophobe': 0}
+    feats = FACTORY.GetFeaturesForMol(mol)
+    proc_feats = []
+    proc_feat_numbers = []
+    for feat in feats:
+        if feat.GetFamily() in pharm_counts.keys():
+            proc_feats.append(feat.GetFamily())
+            proc_feat_numbers.append(len(feat.GetAtomIds()))
+            
+            
+    for idx, p in enumerate(proc_feats):
+        pharm_counts[p] += proc_feat_numbers[idx]
+
+    return pharm_counts
+

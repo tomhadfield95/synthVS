@@ -11,7 +11,7 @@ def define_box_around_ligand(positions, slack=5):
     return {'X': [x_min, x_max], 'Y': [y_min, y_max], 'Z': [z_min, z_max]}
 
 
-def sample_pharmacophores_box(positions, pharm_dict=None):
+def sample_pharmacophores_box(positions, pharm_dict=None, hydrophobic = False):
     if pharm_dict is None:
         pharm_dict = {0: 'Acceptor', 1: 'Donor', 2: 'Hydrophobe'}
     # Increasing diagonal elements on cov matrix increases dispersion from
@@ -20,9 +20,10 @@ def sample_pharmacophores_box(positions, pharm_dict=None):
     box_params = define_box_around_ligand(positions)
 
     # sample random pharmacophore type
-    # FOR NOW WE WON'T THINK ABOUT HYDROPHOBIC INTERACTIONS AND JUST CONSIDER
-    # HYDROGEN BONDS
-    pharm_type = np.random.choice([0, 1, 2], p=[0.5, 0.5, 0.0])
+    if hydrophobic:
+        pharm_type = np.random.choice([0, 1, 2], p=[1/3, 1/3, 1/3])
+    else:
+        pharm_type = np.random.choice([0, 1, 2], p=[0.5, 0.5, 0.0])
 
     # sample pharmacophore location
 
@@ -35,7 +36,7 @@ def sample_pharmacophores_box(positions, pharm_dict=None):
     return random_pharmacophore_pos, pharm_dict[pharm_type]
 
 
-def create_pharmacophore_mol_by_area(mol, area_coef=0.25):
+def create_pharmacophore_mol_by_area(mol, area_coef=0.25, hydrophobic = False):
     # Want the number of pharmacophores to be proportional to the area of the
     # box around the ligand
 
@@ -60,7 +61,7 @@ def create_pharmacophore_mol_by_area(mol, area_coef=0.25):
     orig_positions = np.array(
         [np.array(conf.GetAtomPosition(i)) for i in range(mol.GetNumAtoms())])
     for i in range(num_pharmacophores):
-        pos, pharm_type = sample_pharmacophores_box(orig_positions)
+        pos, pharm_type = sample_pharmacophores_box(orig_positions, hydrophobic = hydrophobic)
         pharm_mol = add_pharm_atom(pharm_mol, pharm_type)
         positions.append(pos)
 
@@ -91,7 +92,7 @@ def sample_atom(mol):
     return idx
 
 
-def sample_pharmacophores(mol, pharm_dict=None, cov=np.identity(3) * 3):
+def sample_pharmacophores(mol, pharm_dict=None, cov=np.identity(3) * 3, hydrophobic = False):
     if pharm_dict is None:
         pharm_dict = {0: 'Acceptor', 1: 'Donor', 2: 'Hydrophobe'}
     # Increasing diagonal elements on cov matrix increases dispersion from
@@ -103,9 +104,11 @@ def sample_pharmacophores(mol, pharm_dict=None, cov=np.identity(3) * 3):
     random_idx = sample_atom(mol)
 
     # sample random pharmacophore type
-    # FOR NOW WE WON'T THINK ABOUT HYDROPHOBIC INTERACTIONS AND JUST CONSIDER
-    # HYDROGEN BONDS
-    pharm_type = np.random.choice([0, 1, 2], p=[0.5, 0.5, 0.0])
+    
+    if hydrophobic:
+        pharm_type = np.random.choice([0, 1, 2], p=[1/3, 1/3, 1/3])
+    else:
+        pharm_type = np.random.choice([0, 1, 2], p=[0.5, 0.5, 0.0])
 
     # sample pharmacophore location
     random_atom_pos = np.array(mol.GetConformer().GetAtomPosition(random_idx))
@@ -114,13 +117,13 @@ def sample_pharmacophores(mol, pharm_dict=None, cov=np.identity(3) * 3):
     return random_pharmacophore_pos, random_idx, pharm_dict[pharm_type]
 
 
-def create_pharmacophore_mol_by_absolute(mol, num_pharmacophores=10):
+def create_pharmacophore_mol_by_absolute(mol, num_pharmacophores=10, hydrophobic = False):
     # Create empty molecule
     pharm_mol = Chem.RWMol()
     positions = []
 
     for i in range(num_pharmacophores):
-        pos, idx, pharm_type = sample_pharmacophores(mol)
+        pos, idx, pharm_type = sample_pharmacophores(mol, hydrophobic = hydrophobic)
 
         pharm_mol = add_pharm_atom(pharm_mol, pharm_type)
         positions.append(pos)
@@ -135,9 +138,9 @@ def create_pharmacophore_mol_by_absolute(mol, num_pharmacophores=10):
     return pharm_mol
 
 
-def create_pharmacophore_mol(mol, num_pharmacophores, area_coef):
+def create_pharmacophore_mol(mol, num_pharmacophores, area_coef, hydrophobic = False):
     assert (num_pharmacophores is None) + (area_coef is None) == 1, (
         'num_pharmacophores and area_coeff are mutually exclusive arguments')
     if num_pharmacophores is None:
-        return create_pharmacophore_mol_by_area(mol, area_coef)
-    return create_pharmacophore_mol_by_absolute(mol, num_pharmacophores)
+        return create_pharmacophore_mol_by_area(mol, area_coef, hydrophobic = hydrophobic)
+    return create_pharmacophore_mol_by_absolute(mol, num_pharmacophores, hydrophobic = hydrophobic)

@@ -57,6 +57,8 @@ def simple_summary_stats(mols, pharm_mols, labels, cpus=1):
     def process_mols(mol_df):
         df_actives = mol_df.loc[mol_df['labels'] == 1]
         df_inactives = mol_df.loc[mol_df['labels'] == 0]
+        
+        print(f'Proportion of actives: {round(df_actives.shape[0]/mol_df.shape[0], 3)}')
 
         # Average number of polar atoms
         donor_count_active, acceptor_count_active = get_donor_acceptor_numbers(
@@ -107,6 +109,8 @@ def simple_summary_stats(mols, pharm_mols, labels, cpus=1):
             )
 
         return active_stats, inactive_stats
+    
+    print(f'mols: {len(mols)}, pharm_mols: {len(pharm_mols)}, labels: {len(labels)}')
 
     df = pd.DataFrame(
         {'mols': mols, 'pharm_mols': pharm_mols, 'labels': labels})

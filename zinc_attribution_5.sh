@@ -1,0 +1,1 @@
+python compute_attributions.py /data/hookbill/hadfield/syntheticVS/data/zinc_50ops_ac0025_t4_processed /data/hookbill/hadfield/syntheticVS/data/pdbbind_filtered_test_set -ad attribution_dfs_zinc_pc5 -f features_plec_5 -l labels_plec_5
