@@ -1,5 +1,5 @@
 # SynthPharm
-Is the whole field just a house of cards? Tom and Jack go on an adventure to find out!
+Ongoing project in collaboration with Jack Scantlebury, investigating the extent to which deep learning methods are able to correctly identify important functional groups in protein-ligand binding. TLDR: They're better than fingerprint-based methods, but only under the right circumstances. Manuscript to appear soon!
 
 The only requirement for this project is
 [PointVS](https://github.com/jscant/PointVS). A complete installation including
