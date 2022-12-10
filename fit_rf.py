@@ -138,7 +138,10 @@ def main(args):
 
     if args.model_fname is not None:
         joblib.dump(clf_plec, args.model_fname, compress = 3)
-    
+
+    if args.model_morgan_fname is not None:
+        joblib.dump(clf_morgan, args.model_morgan_fname, compress = 3)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -165,6 +168,7 @@ if __name__ == '__main__':
     parser.add_argument('--morgan_output_fname', '-mof', type = str, default = 'morgan_performance', help = 'Name for saving summary statistics')
 
     parser.add_argument('--model_fname', type = str, default = None, help = 'Location to save trained model (caution: Random Forests can be very large)' )
+    parser.add_argument('--model_morgan_fname', type = str, default = None, help = 'Location to save trained morgan fingerprint model (caution: Random Forests can be very large)' )
 
 
 

@@ -2,7 +2,8 @@ from sklearn.model_selection import train_test_split as tts
 from sklearn.ensemble import RandomForestClassifier as rfc
 from sklearn.metrics import roc_auc_score, accuracy_score
 from rdkit import RDConfig, Chem
-from rdkit.Chem import ChemicalFeatures
+from rdkit.Chem import ChemicalFeatures, AllChem, DataStructs
+
 from collections import defaultdict
 from pathlib import Path
 import argparse
@@ -470,6 +471,113 @@ def get_masking_ranking_dataframe(lp_file_paths, RF_model, binding_threshold = 3
         shutil.rmtree(lig_masked_dir)
 
     return atom_ranking
+
+
+
+
+####Attribution for Morgan Fingerprints#######
+
+def rf_pred_morgan(lig_path, RF_model):
+
+    #Get Morgan fingerprint
+    lig = Chem.MolFromMolFile(lig_path)
+    if lig is not None:
+        fp = AllChem.GetMorganFingerprintAsBitVect(lig, 2, nBits=1024)
+        morgan_fp_arr = np.zeros((0,), dtype=np.int8)
+        DataStructs.ConvertToNumpyArray(fp, morgan_fp_arr)
+
+        pred = RF_model.predict_proba(morgan_fp_arr.reshape(1,-1))[0][1]       
+
+        return pred
+
+    else:
+        return None
+
+
+def get_masking_score_morgan(lig_path, idx, lig_masked_path, RF_model):
+
+    lig = Chem.MolFromMolFile(lig_path)
+    all_atom_score = rf_pred_morgan(lig_path, RF_model)
+    lig_masked = swap_for_dummy_atom(lig, idx)
+    Chem.MolToMolFile(lig_masked, lig_masked_path)
+    masked_score = rf_pred_morgan(lig_masked_path,RF_model = RF_model)
+
+    #print(all_atom_score, masked_score)
+
+    return all_atom_score - masked_score
+
+
+
+def get_masking_ranking_dataframe_morgan(lp_file_paths, RF_model, binding_threshold = 3.5, hydrophobic = False, delete_temp_file = True):
+    
+    
+    lig_path = lp_file_paths[0]
+    prot_path = lp_file_paths[1]
+
+    #Create temporary directory to store
+    lig_masked_dir = tempfile.mkdtemp()
+    lig_masked_path = f'{lig_masked_dir}/lig_masked.sdf'
+    
+
+    lig = Chem.MolFromMolFile(lig_path)
+    prot = Chem.MolFromMolFile(prot_path)
+
+
+    attribution_scores = []
+    atom_coords = []
+    
+    for atom_idx in range(lig.GetNumHeavyAtoms()):
+
+        #print(atom_idx)
+
+        #Get Attribution score
+        attribution_score = get_masking_score_morgan(lig_path, atom_idx, lig_masked_path, RF_model)
+        attribution_scores.append(attribution_score)
+        
+        pos = np.array(lig.GetConformer().GetAtomPosition(atom_idx))
+        atom_coords.append(pos)
+        
+    #print(attribution_scores)
+    
+    atom_coords = np.array(atom_coords)
+    
+
+
+    atom_ranking = pd.DataFrame({'atom_idx':np.arange(lig.GetNumHeavyAtoms()), 'x':atom_coords[:, 0], 
+                                 'y':atom_coords[:, 1], 'z':atom_coords[:, 2], 
+                                 'attribution':attribution_scores}).sort_values('attribution', ascending = False)
+    
+    
+    lig_label_df, pharm_label_df = create_gt_df(lig, prot, threshold=binding_threshold, hydrophobic = hydrophobic)
+    
+    #print(lig_label_df)
+    #print(pharm_label_df)
+
+
+    #Do index matching
+    
+    #atom_types = []
+    involved_in_binding = []
+    
+    for idx, row in atom_ranking.iterrows():
+        for jdx, sow in lig_label_df.iterrows():
+            if vector_distance(np.array([row['x'], row['y'], row['z']]), np.array([sow['x'], sow['y'], sow['z']])) < 0.05:
+                
+                #atom_types.append(sow['type'])
+                if not hydrophobic:
+                    involved_in_binding.append(sow['binding'])
+                else:
+                    involved_in_binding.append(sow['contribution'])
+    
+    #atom_ranking['atom_type'] = atom_types
+    atom_ranking['binding'] = involved_in_binding
+    
+    if delete_temp_file:
+        shutil.rmtree(lig_masked_dir)
+
+    return atom_ranking
+
+
 
 
 

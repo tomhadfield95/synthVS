@@ -23,12 +23,22 @@ def get_atomwise_contributions(mol, contrib_df, ligand_atoms = True):
         
         atom_indices = []
         for idx, row in contrib_df.iterrows():
+            
+            found_match = False
 
             for atom in mol.GetAtoms():
 
                 if vec_to_vec_dist(row['ligand_pos'], np.array(mol.GetConformer().GetAtomPosition(atom.GetIdx()))) < 0.05:
                     atom_indices.append(atom.GetIdx())
-                    
+                    found_match = True
+                    break
+
+            if found_match == False:
+                print(Chem.MolToMolBlock(mol))
+                print(contrib_df)
+                print(idx, row)
+
+
         contrib_df['lig_atom_idx'] = atom_indices
         
         atom_contibutions = contrib_df[['lig_atom_idx', 'contribution']].groupby('lig_atom_idx').aggregate(sum)
