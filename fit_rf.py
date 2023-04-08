@@ -70,9 +70,8 @@ def main(args):
 
     
     #Do train/test split
-    test_prop = args.test_set_size/y.shape[0]
     
-    X_morgan_train, X_morgan_test, X_plec_train, X_plec_test, y_train, y_test = tts(X_morgan, X_plec, y, test_size=test_prop, random_state=42)
+    X_morgan_train, X_morgan_test, X_plec_train, X_plec_test, y_train, y_test = tts(X_morgan, X_plec, y, test_size=args.test_set_proportion, random_state=42)
     
     #Perturb training set labels if necessary
     if args.noise_ratio is not None:
@@ -146,7 +145,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('root_dir', type = str, help = 'Location of root directory where numpy arrays are stored')
-    parser.add_argument('--test_set_size', '-t', type = int, default = 500, help = 'Specify size of test set')
+    parser.add_argument('--test_set_proportion', '-t', type = int, default = 0.2, help = 'Specify size of test set')
 
     
     parser.add_argument('--noise_ratio', '-nr', type = float, default = None, help = 'Fraction of training examples to mislabel')
