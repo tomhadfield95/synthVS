@@ -8,20 +8,7 @@ Users can generate their own synthetic protein-ligand complexes and use them to 
 
 ## Installing synthVS
 
-For the time being, synthVS requires the installation of [PointVS](https://github.com/jscant/PointVS) as a prerequisite. A more lightweight installation will soon be available. 
-
-synthVS can be installed by running the following commands:
-
-```
-git clone git@github.com:jscant/PointVS
-cd PointVS
-conda env create -f environment.yml python=3.8
-conda activate pointvs
-pip install -e .
-cd ..
-git clone git@github.com:tomhadfield95/synthVS
-cd synthVS
-```
+synthVS requires the installation of a few basic python libraries (`pandas`, `scikit-learn` etc.), as well as `RDKit` to generate the synthetic-protein ligand complexes and the Open Drug Discovery Toolkit (oddt) to calculate the Protein-Ligand Extended Connectivity (PLEC) Fingerprints. You can install the required environments using the `environment.yml` file provided.
 
 
 ## Generating datasets with synthVS
