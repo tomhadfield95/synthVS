@@ -8,7 +8,24 @@ Users can generate their own synthetic protein-ligand complexes and use them to 
 
 ## Installing synthVS
 
-synthVS requires the installation of a few basic python libraries (`pandas`, `scikit-learn` etc.), as well as `RDKit` to generate the synthetic-protein ligand complexes and the Open Drug Discovery Toolkit (oddt) to calculate the Protein-Ligand Extended Connectivity (PLEC) Fingerprints. You can install the required environments using the `environment.yml` file provided.
+synthVS requires the installation of a few basic python libraries (`pandas`, `scikit-learn` etc.), as well as `RDKit` to generate the synthetic-protein ligand complexes and the Open Drug Discovery Toolkit (oddt) to calculate the Protein-Ligand Extended Connectivity (PLEC) Fingerprints. Run: 
+
+```
+#Download Repo
+git clone https://github.com/tomhadfield95/synthVS.git
+cd synthVS
+
+
+#Setup conda environment
+conda create -n synthvs_env
+conda activate synthvs_env
+conda install -c conda-forge pandas pathos scikit-learn matplotlib rdkit
+pip install oddt
+
+
+#Verify installation has worked
+python ds_generation/main.py --help
+```
 
 
 ## Generating datasets with synthVS
