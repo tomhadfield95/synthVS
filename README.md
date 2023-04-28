@@ -20,7 +20,7 @@ cd synthVS
 conda create -n synthvs_env
 conda activate synthvs_env
 conda install -c conda-forge pandas pathos scikit-learn matplotlib rdkit
-conda install -c anaconda yaml
+conda install -c anaconda pyyaml
 pip install oddt
 
 
@@ -34,6 +34,15 @@ python ds_generation/main.py --help
 To generate a dataset of synthetic protein-ligand complexes, we require an sdf file containing a set of ligands with 3D poses. We can then pass this file to the script `ds_generation/main.py`, which takes the following arguments
 
 ```
+python ds_generation/main.py --help
+usage: main.py [-h] [--max_pharmacophores MAX_PHARMACOPHORES] [--area_coef AREA_COEF]
+               [--mean_pharmacophores MEAN_PHARMACOPHORES]
+               [--num_opportunities NUM_OPPORTUNITIES]
+               [--distance_threshold DISTANCE_THRESHOLD] [--hydrophobic]
+               [--score_threshold SCORE_THRESHOLD] [--force_labels FORCE_LABELS]
+               [--use_multiprocessing] [--simplify_labelling]
+               ligands output_dir
+
 positional arguments:
   ligands               Location of ligand sdf(s)
   output_dir            Directory in which to store outputs
@@ -48,19 +57,24 @@ optional arguments:
   --num_opportunities NUM_OPPORTUNITIES, -n NUM_OPPORTUNITIES
                         Number of interaction opportunities per ligand.
   --distance_threshold DISTANCE_THRESHOLD, -t DISTANCE_THRESHOLD
-                        Maximum distance between ligand functional groups and their respective pharmacophores for the combination of the two to be
+                        Maximum distance between ligand functional groups and their
+                        respective pharmacophores for the combination of the two to be
                         considered an active
   --hydrophobic, -hy    Include hydrophobic residues in the pharmacophore generation process
   --score_threshold SCORE_THRESHOLD, -st SCORE_THRESHOLD
-                        Threshold for interaction scoring which determines whether an example will be active or not
+                        Threshold for interaction scoring which determines whether an example
+                        will be active or not
   --force_labels FORCE_LABELS, -f FORCE_LABELS
-                        Attempts to generate ligands until the desired label is obtained; this arg can be either 0 or 1, which sets the label, or 2, in
-                        which case whether something is labelled as a binding or non-binding structure depends on whether the filename has "active" or
-                        either "inactive" or "decoy" in its path.
+                        Attempts to generate ligands until the desired label is obtained;
+                        this arg can be either 0 or 1, which sets the label, or 2, in which
+                        case whether something is labelled as a binding or non-binding
+                        structure depends on whether the filename has "active" or either
+                        "inactive" or "decoy" in its path.
   --use_multiprocessing, -mp
                         Use multiple CPU processes
   --simplify_labelling, -sl
                         only use positives with a single interaction
+
 ```
 
 To generate a set of synthetic protein-ligand complexes, using the "Polar" generative process, run 
