@@ -20,6 +20,7 @@ cd synthVS
 conda create -n synthvs_env
 conda activate synthvs_env
 conda install -c conda-forge pandas pathos scikit-learn matplotlib rdkit
+conda install -c anaconda yaml
 pip install oddt
 
 
