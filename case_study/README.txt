@@ -1,0 +1,1 @@
+The files contained in the sdf directory contain the synthetic protein-ligand complexes used in the paper to understand the ability of the PLEC fingerprints to precisely encode spatial information. Each synthetic protein file is the same, except for one synthetic residue, which is moced along a line.
