@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from pathos.multiprocessing import ProcessingPool as Pool
-from point_vs.utils import expand_path, save_yaml
+from utils import expand_path, save_yaml
 from rdkit import RDConfig, Chem
 from rdkit.Chem import ChemicalFeatures
 from scipy.stats import gamma

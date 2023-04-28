@@ -16,7 +16,7 @@ import glob
 import numpy as np
 import pandas as pd
 from pathos.multiprocessing import ProcessingPool as Pool
-from point_vs.utils import expand_path, mkdir, save_yaml, pretify_dict, \
+from utils import expand_path, mkdir, save_yaml, pretify_dict, \
     format_time, Timer
 from rdkit import Chem
 from rdkit import RDLogger

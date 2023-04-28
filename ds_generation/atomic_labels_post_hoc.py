@@ -12,7 +12,7 @@ from rdkit import Chem
 import glob
 import numpy as np
 import pandas as pd
-from point_vs.utils import save_yaml
+from utils import save_yaml
 import argparse
 
 def main(args):

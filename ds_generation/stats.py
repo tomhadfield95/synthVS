@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from pathos.multiprocessing import ProcessingPool as Pool
-from point_vs.utils import expand_path, load_yaml, pretify_dict, format_time, \
+from utils import expand_path, load_yaml, pretify_dict, format_time, \
     Timer
 from rdkit import Chem
 

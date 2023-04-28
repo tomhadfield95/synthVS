@@ -10,7 +10,7 @@ import argparse
 import glob
 import pandas as pd
 import numpy as np
-from point_vs.utils import mkdir, save_yaml
+from utils import mkdir, save_yaml
 
 from rdkit import Chem
 
